@@ -1,0 +1,39 @@
+VARDS Peteris
+TEVS Janis
+MATE Anna
+
+VARDS Anna
+TEVS Marcis
+MATE Sofija
+
+VARDS Karlis
+MATE Baiba
+TEVS Juris
+
+VARDS Nora
+TEVS Janis
+MATE Klera
+
+paWVeGfJXBMdjyJhXOnhro5BqmYmTbS6h84PjSffIRMBKCvUDn9wOQdnh
+
+VARDS Karlis
+MATE Baiba
+TEVS Juris
+
+            // struct Node *trav = ft1->head;
+            // while (trav)
+            // {
+            //     if (strcmp(trav->father->name, data) == 0)
+            //     {
+            //         struct node *temp = trav;
+            //         ft1->head = person;
+
+            //     }
+
+            //     trav = trav->father;
+            // }
+            // free(trav);
+
+VARDS Anna
+TEVS Marcis
+MATE Sofija

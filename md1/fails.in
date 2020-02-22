@@ -1,0 +1,35 @@
+VARDS Peteris
+TEVS Janis
+MATE Anna
+
+VARDS Misha
+TEVS Peteris
+MATE Liga
+
+VARDS Anna
+TEVS Marcis
+MATE Sofija
+
+VARDS Janis
+TEVS Ansis
+MATE Dita
+
+VARDS Liene
+TEVS Misha
+MATE Katrina
+
+VARDS Kaspars
+TEVS Zigmnunds
+MATE Liene
+
+# put people in people array already at the start ???
+# person->weight = pob->children[0]->weight + 1;
+# later make people array dynamic by realloc space for it
+# later check for memory leak when 
+# initliazing strings in data or line or label
+
+#  || strcmp(people[i]->name, person->name) == 0)
+# // struct Person *head, *curr, *tail = NULL;
+
+# Marcis, Sofija, Ansis, Dita, Janis, Anna, Peteris, 
+# Liga, Misha, Katrina, Liene, Zigmunds, Kaspars
