@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <limits.h>
 #include <sys/stat.h>
+#include "LSP_PD3_andris_lapins.h"
 
 void list_directories(char*, char*);
 
