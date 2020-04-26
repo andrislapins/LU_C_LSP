@@ -29,12 +29,14 @@
 #define PORT 9999
 #define MAX_CLIENTS 4
 #define MAX_BUFFER_SIZE 257
+#define COUNT_OF_FIELDS 1
 
 // These lengths are [useful data]+1 size because of the need to keep last element \0.
 #define MSG_TYPE_LEN 3
 #define PLAYER_NAME_LEN 31
 #define PLAYER_PASS_LEN 11
 #define GAME_NAME_LEN 21
+
 #define FIELD_NAME_LEN 21
 
 typedef struct {
@@ -49,6 +51,13 @@ typedef struct {
     int sock_fd;
     struct sockaddr_in address;
 } client_t;
+
+typedef struct {
+    struct Field *field;
+    struct Line *start_line;
+    struct Line *main_line;
+    int n_extra_lines;
+} field_t;
 
 // For handling errors and killing the process.
 void err_die(char* err_msg);

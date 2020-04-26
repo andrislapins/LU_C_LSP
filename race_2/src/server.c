@@ -8,12 +8,15 @@ static _Atomic int client_count = 0;
 static int player_id = 100;
 static int game_id = 200;
 
-int count_of_fields = 1;
+// Globals structures for race.
+field_t *fields[COUNT_OF_FIELDS];
 
-void handle_sigint(int sig) {
-    printf("Caught signal - %d\n", sig);
-    exit(EXIT_FAILURE);
-}
+// Global structure initialization.
+void init_fields();
+
+// Handling signals.
+void handle_sigint(int sig);
+
 
 void create_game_response(char *buffer, char *msg_type, client_t *client) {
     deserialize_msg_CG(buffer+3, client);
@@ -36,19 +39,23 @@ void create_game_response(char *buffer, char *msg_type, client_t *client) {
 void get_number_of_fields_response(char *buffer, char* msg_type, client_t *client) {
     // Set a response back to the client.
     bzero(buffer, MAX_BUFFER_SIZE);
-    serialize_msg_NF_response(buffer, count_of_fields);
-    printf("Sent the count of available fields to player %s\n", client->player_name);
+    serialize_msg_NF_response(buffer, COUNT_OF_FIELDS);
+    printf("Sent the count of available fields to player - %s\n", client->player_name);
 }
 
 void field_info_response(char *buffer, char* msg_type, client_t *client) {
     int chose;
 
     deserialize_msg_FI(buffer, &chose);
+    printf("Player %s chose to get more info about field - %d\n", client->player_name, chose);
+    
+    // use chose-1 to access field from fields arr.
+    //
 }
 
 void handle_message(char *buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN] = { buffer[0], buffer[1], '\0' };
-    printf("Received msg_type - %s from player %s\n", msg_type, client->player_name);
+    printf("Received msg_type - %s from player - %s\n", msg_type, client->player_name);
 
     if (strcmp(msg_type, "CG") == 0) {
         create_game_response(buffer, msg_type, client);
@@ -137,6 +144,7 @@ int main(int argc, char **argv) {
     printf("Server is on...\n");
 
     // [functions which initialize such global vars like an array of Field + Line pointers]
+    init_fields();
 
     socklen_t client_len = sizeof(client_addr);
     client_socket = accept(listen_socket, (struct sockaddr*)&client_addr, &client_len);
@@ -151,4 +159,36 @@ int main(int argc, char **argv) {
     printf("Goodbye!\n");
     close(listen_socket);
     exit(EXIT_SUCCESS);
+}
+
+void handle_sigint(int sig) {
+    printf("Caught signal - %d\n", sig);
+    exit(EXIT_FAILURE);
+}
+
+void init_fields() {
+    field_t *myfield = (field_t*)calloc(sizeof(field_t), 1);
+
+    myfield->field = (struct Field*)calloc(sizeof(struct Field), 1);
+    myfield->field->ID = 1;
+    strcpy(myfield->field->name, "Grand Tour");
+    myfield->field->Height = 12;
+    myfield->field->ID = 46;
+
+    myfield->start_line = (struct Line*)calloc(sizeof(struct Line), 1);
+    myfield->start_line->beggining.x = 15;
+    myfield->start_line->beggining.y = 2;
+    myfield->start_line->end.x = 15;
+    myfield->start_line->end.y = 5;
+
+    myfield->main_line = (struct Line*)calloc(sizeof(struct Line), 1);
+    myfield->main_line->beggining.x = 10;
+    myfield->main_line->beggining.y = 5;
+    myfield->main_line->end.x = 25;
+    myfield->main_line->end.y = 6;
+
+    myfield->n_extra_lines = 0;
+
+    // Save this field in the global fields array.
+    fields[0] = myfield; 
 }
