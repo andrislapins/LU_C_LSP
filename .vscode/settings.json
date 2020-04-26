@@ -2,6 +2,8 @@
     "files.associations": {
         "stdlib.h": "c",
         "unistd.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "common.h": "c",
+        "serialization.h": "c"
     }
 }
