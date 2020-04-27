@@ -2,6 +2,8 @@
 #include "../include/protocol.h"
 #include "../include/serialization.h"
 
+char ip[IP_LEN];
+
 void err_die(char* err_msg) {
     printf("ERROR: %s\n", err_msg);
     printf("(errno = %d): %s\n", errno, strerror(errno));
@@ -48,9 +50,9 @@ void generate_password(client_t *client) {
         client->player_name, client->player_pass);
 }
 
-char *print_ip_addr(struct sockaddr_in addr) {
-    char *ip = "IP: %d.%d.%d.%d\n";
-    printf(ip,
+char *ip_addr(struct sockaddr_in addr) {
+    memset(ip, 0, IP_LEN);
+    snprintf(ip, IP_LEN, "%d.%d.%d.%d",
         addr.sin_addr.s_addr & 0xff,
         (addr.sin_addr.s_addr & 0xff00) >> 8,
         (addr.sin_addr.s_addr & 0xff0000) >> 16,

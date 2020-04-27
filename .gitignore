@@ -1,0 +1,8 @@
+# All output files.
+*.o
+*.out
+*.bin
+*.dat
+
+# Zip files.
+*.zip

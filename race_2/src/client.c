@@ -6,12 +6,11 @@
 
 void handle_sigint(int sig);
 
-int get_number_of_fields(char* buffer, client_t *myclient, int serv_sock) {
+int get_number_of_fields(char* buffer, client_t *myclient, field_t *myfield, int serv_sock) {
     int n_field_ids, chose;
     ssize_t data_n;
-    char msg_type[MSG_TYPE_LEN] = "NF\0";
-    // Expecting the entered field id contain 4 digits. +1 is for \0 character.
-    int n_digits = 5;
+    char msg_type[] = "NF";
+    int n_digits = 5; // EXP: Expecting the entered field id contain 4 digits. +1 is for \0 character.
     char *num_str = (char*)calloc(n_digits, 1);
 
     // Serialize the data.
@@ -21,68 +20,73 @@ int get_number_of_fields(char* buffer, client_t *myclient, int serv_sock) {
     // Initiate sending and receiving.
     data_n = send(serv_sock, buffer, MAX_BUFFER_SIZE, 0);
     if (data_n < 0) {
-        free(myclient);
-        free(buffer);
         err_die("Could not send message of type NUMBER OF FIELDS!");
     }
 
     bzero(buffer, MAX_BUFFER_SIZE);
     data_n = recv(serv_sock, buffer, MAX_BUFFER_SIZE, 0);
     if (data_n < 0) {
-        free(myclient);
-        free(buffer);
         err_die("Could not receive message of type NUMBER OF FIELDS!");
     }
 
     deserialize_msg_NF_response(buffer, &n_field_ids);
 
-    printf("Choose a field in range from 1 to %d to get more info: \n", n_field_ids);
+    printf("Choose a field in range from 1 to %d to get more info: ", n_field_ids);
     fgets(num_str, n_digits, stdin);
 
     chose = atoi(num_str);
+    if (chose <= 0 || chose > n_field_ids) {
+        err_die("You provided an invalid number!");
+    }
     printf("You chose: %d\n", chose);
 
     /* FIELD INFO */
 
-    msg_type[MSG_TYPE_LEN] = "FI\0";
+    strncpy(msg_type, "FI", 2);
     bzero(buffer, MAX_BUFFER_SIZE);
     serialize_msg_FI(buffer, msg_type, chose);
 
     data_n = send(serv_sock, buffer, MAX_BUFFER_SIZE, 0);
     if (data_n < 0) {
-        free(myclient);
-        free(buffer);
         err_die("Could not send message of type FIELD INFO!");
     }
 
     bzero(buffer, MAX_BUFFER_SIZE);
     data_n = recv(serv_sock, buffer, MAX_BUFFER_SIZE, 0);
     if (data_n < 0) {
-        free(myclient);
-        free(buffer);
         err_die("Could not receive message of type FIELD INFO!");
     }
 
-    deserialize_msg_FI_response(buffer);
+    deserialize_msg_FI_response(buffer, myfield);
 
-    printf("Field ID: %d\n", 0);
-    printf("Field name: %s\n", "bestfieldname");
-    printf("Field width: %d\n", 0);
-    printf("Field height: %d\n", 0);
-    printf("Start line x: %d, y: %d\n", 0, 0);
-    printf("Main line x: %d, y: %d\n", 0, 0);
-    printf("Number of extra lines: %d\n", 1);
-    printf("Extra line one x: %d, y: %d\n", 0, 0);
+    printf("Field ID: %d\n", myfield->field->ID);
+    printf("Field name: %s\n", myfield->field->name);
+    printf("Field width: %d\n", myfield->field->Width);
+    printf("Field height: %d\n", myfield->field->Height);
+    printf("Start line beggining x: %f, y: %f\n", myfield->start_line->beggining.x, myfield->start_line->beggining.y);
+    printf("Start line end x: %f, y: %f\n", myfield->start_line->end.x, myfield->start_line->end.y);
+    printf("Main line beggining x: %f, y: %f\n", myfield->main_line->beggining.x, myfield->main_line->beggining.y);
+    printf("Main line end x: %f, y: %f\n", myfield->main_line->end.x, myfield->main_line->end.y);
+    printf("Number of extra lines: %d\n", myfield->n_extra_lines);
+    // NOTE: Need to figure out how to handle extra lines. 
+    // (OPT: A cycle going through the number of extra lines, and in that cycle
+    // create new extra line instances which to store in a global array of
+    // serialization.c file. Later the data of this array pass through params
+    // of deserialize_msg_FI_response();
+    // for (int i = 0; i < myfield->n_extra_lines; i++) {
+    //     printf("Extra line i beggining x: %d, y: %d\n", myfields[i](line values), myfields[i](line values));
+    //     printf("Extra line i end x: %d, y: %d\n", myfields[i](line values), myfields[i](line values));
+    // }
+    // OPT: We migth ask for FIELD INFO for a particular field until one is chosen in a while loop.
+    // or just pursue with the first asked field (almost like now);
 
-    // later ask for FIELD INFO for a particular field until one is chosen in a while loop.
-
-    return n_field_ids;
+    return myfield->field->ID;
 }
 
 void create_game(char *buffer, client_t *myclient, int serv_sock, int field_id) {
     ssize_t data_n;
 
-    char msg_type[MSG_TYPE_LEN] = "CG\0";
+    char msg_type[] = "CG";
     char *player_name = (char*)calloc(PLAYER_NAME_LEN, 1);
     char *game_name = (char*)calloc(GAME_NAME_LEN, 1);
 
@@ -107,16 +111,12 @@ void create_game(char *buffer, client_t *myclient, int serv_sock, int field_id) 
     // Initiate sending and receiving.
     data_n = send(serv_sock, buffer, MAX_BUFFER_SIZE, 0);
     if (data_n < 0) {
-        free(myclient);
-        free(buffer);
         err_die("Could not send message of type CREATE GAME!");
     }
 
     bzero(buffer, MAX_BUFFER_SIZE);
     data_n = recv(serv_sock, buffer, MAX_BUFFER_SIZE, 0);
     if (data_n < 0) {
-        free(myclient);
-        free(buffer);
         err_die("Could not receive message of type CREATE GAME!");
     }
 
@@ -132,11 +132,17 @@ void create_game(char *buffer, client_t *myclient, int serv_sock, int field_id) 
 }
 
 int main(int argc, char **argv) {
+    // Variables typically for socket programmin.
     struct sockaddr_in serv_addr;
     int serv_sock;
     int err;
-
     char *serv_ip = "127.0.0.1";
+    
+    // Variables typically for the race game.
+    int field_id;
+    char *buffer;
+    client_t *myclient;
+    field_t *myfield;
 
     signal(SIGINT, handle_sigint);
 
@@ -153,19 +159,16 @@ int main(int argc, char **argv) {
     }
 
     // Initialize the client and the buffer.
-    client_t *myclient = (client_t*)calloc(sizeof(client_t), 1);
-    char *buffer = (char*)calloc(MAX_BUFFER_SIZE, 1);
+    buffer = (char*)calloc(MAX_BUFFER_SIZE, 1);
+    myclient = (client_t*)calloc(sizeof(client_t), 1);
+    myfield = (field_t*)calloc(sizeof(field_t), 1);
 
-    /* === The lifecycle of the race game === */
-
-    int field_id = get_number_of_fields(buffer, myclient, serv_sock);
+    //The lifecycle of the race game.
+    field_id = get_number_of_fields(buffer, myclient, myfield, serv_sock);
     create_game(buffer, myclient, serv_sock, field_id);
 
-    // the next nodes in lifecycle...
+    // ...
 
-    free(myclient);
-    free(buffer);
-    close(serv_sock);
     exit(EXIT_SUCCESS);
 }
 

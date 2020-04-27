@@ -27,6 +27,7 @@
 #include "protocol.h"
 
 #define PORT 9999
+#define IP_LEN 16
 #define MAX_CLIENTS 4
 #define MAX_BUFFER_SIZE 257
 #define COUNT_OF_FIELDS 1
@@ -50,6 +51,7 @@ typedef struct {
 
     int sock_fd;
     struct sockaddr_in address;
+    char ip[IP_LEN];
 } client_t;
 
 typedef struct {
@@ -63,7 +65,7 @@ typedef struct {
 void err_die(char* err_msg);
 void print_array_in_hex(char *name, void* arr, int len);
 void generate_password(client_t *client);
-char *print_ip_addr(struct sockaddr_in addr);
+char *ip_addr(struct sockaddr_in addr);
 void get_group_n_id(int *base, int *group, int *index);
 
 #endif

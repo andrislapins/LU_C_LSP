@@ -23,6 +23,28 @@ char* deserialize_int(char *buffer, int *value) {
     return buffer + len;
 }
 
+/* float serialization/deserialization */
+char *serialize_float(char *buffer, float *value) {
+    char *value_s = (char*)value;
+    int len = sizeof(float);
+
+    for (int i = 0; i < len; i++) {
+        buffer[i] = value_s[i];
+    }
+
+    return buffer + len;
+}
+
+char* deserialize_float(char *buffer, float *value) {
+    float num;
+    int len = sizeof(float);
+
+    memcpy(&num, buffer, len);
+    *value = num;
+
+    return buffer + len;
+}
+
 /* string serialization/deserialization */
 char *serialize_string(char *buffer, char *value, int len) {
     for (int i = 0; i < len; i++) {
@@ -63,16 +85,16 @@ void serialize_msg_CG(char *buffer, char *msg_type, char *player_name, char *gam
     buffer = serialize_int(buffer, &(field_id));
 }
 
-void serialize_msg_CG_response(char *buffer, client_t *client) {
-    buffer = serialize_int(buffer, &(client->curr_game_id));
-    buffer = serialize_int(buffer, &(client->player_id));
-    buffer = serialize_string(buffer, client->player_pass , PLAYER_PASS_LEN);
-}
-
 void deserialize_msg_CG(char *buffer, client_t *client) {
     buffer = deserialize_string(buffer, client->player_name, PLAYER_NAME_LEN);
     buffer = deserialize_string(buffer, client->curr_game_name, GAME_NAME_LEN);
     buffer = deserialize_int(buffer, &(client->chosen_field_id));
+}
+
+void serialize_msg_CG_response(char *buffer, client_t *client) {
+    buffer = serialize_int(buffer, &(client->curr_game_id));
+    buffer = serialize_int(buffer, &(client->player_id));
+    buffer = serialize_string(buffer, client->player_pass , PLAYER_PASS_LEN);
 }
 
 void deserialize_msg_CG_response(char *buffer, client_t *client) {
@@ -86,12 +108,12 @@ void serialize_msg_NF(char *buffer, char *msg_type) {
     buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
 }
 
-void serialize_msg_NF_response(char *buffer, int count_of_fields) {
-    buffer = serialize_int(buffer, &(count_of_fields));
-}
-
 void deserialize_msg_NF() { // Unused, but leave for the sake of ordering things.
     // empty.
+}
+
+void serialize_msg_NF_response(char *buffer, int count_of_fields) {
+    buffer = serialize_int(buffer, &(count_of_fields));
 }
 
 void deserialize_msg_NF_response(char *buffer, int *n_field_ids) {
@@ -106,4 +128,36 @@ void serialize_msg_FI(char *buffer, char *msg_type, int chose) {
 
 void deserialize_msg_FI(char *buffer, int *chose) {
     buffer = deserialize_int(buffer, chose);
+}
+
+void serialize_msg_FI_response(char *buffer, field_t *myfield) {
+    buffer = serialize_int(buffer, &(myfield->field->ID));
+    buffer = serialize_string(buffer, myfield->field->name , FIELD_NAME_LEN);
+    buffer = serialize_int(buffer, &(myfield->field->Width));
+    buffer = serialize_int(buffer, &(myfield->field->Height));
+    buffer = serialize_float(buffer, &(myfield->start_line->beggining.x));
+    buffer = serialize_float(buffer, &(myfield->start_line->beggining.y));
+    buffer = serialize_float(buffer, &(myfield->start_line->end.x));
+    buffer = serialize_float(buffer, &(myfield->start_line->end.y));
+    buffer = serialize_float(buffer, &(myfield->main_line->beggining.x));
+    buffer = serialize_float(buffer, &(myfield->main_line->beggining.y));
+    buffer = serialize_float(buffer, &(myfield->main_line->end.x));
+    buffer = serialize_float(buffer, &(myfield->main_line->end.y));
+    buffer = serialize_int(buffer, &(myfield->n_extra_lines));
+}
+
+void deserialize_msg_FI_response(char *buffer, field_t *myfield) {
+    buffer = deserialize_int(buffer, &(myfield->field->ID));
+    buffer = deserialize_string(buffer, myfield->field->name , FIELD_NAME_LEN);
+    buffer = deserialize_int(buffer, &(myfield->field->Width));
+    buffer = deserialize_int(buffer, &(myfield->field->Height));
+    buffer = deserialize_float(buffer, &(myfield->start_line->beggining.x));
+    buffer = deserialize_float(buffer, &(myfield->start_line->beggining.y));
+    buffer = deserialize_float(buffer, &(myfield->start_line->end.x));
+    buffer = deserialize_float(buffer, &(myfield->start_line->end.y));
+    buffer = deserialize_float(buffer, &(myfield->main_line->beggining.x));
+    buffer = deserialize_float(buffer, &(myfield->main_line->beggining.y));
+    buffer = deserialize_float(buffer, &(myfield->main_line->end.x));
+    buffer = deserialize_float(buffer, &(myfield->main_line->end.y));
+    buffer = deserialize_int(buffer, &(myfield->n_extra_lines));
 }

@@ -17,13 +17,21 @@ void init_fields();
 // Handling signals.
 void handle_sigint(int sig);
 
+char *from_who(client_t *client) {
+    if (strlen(client->player_name) != 0) {
+        return client->player_name;
+    }
+
+    return client->ip;
+}
 
 void create_game_response(char *buffer, char *msg_type, client_t *client) {
-    deserialize_msg_CG(buffer+3, client);
+    deserialize_msg_CG(buffer, client);
 
     client->curr_game_id = game_id++;
     
-    printf("Player - %s (id: %d) ", client->player_name, client->player_id);
+    printf("Player - %s ", from_who(client));
+    printf("(id: %d)(ip: %s) ", client->player_id, client->ip);
     printf("created a game - %s ", client->curr_game_name);
     printf("(id: %d) ", client->curr_game_id);
     printf("on field - %d\n", client->chosen_field_id);
@@ -40,22 +48,24 @@ void get_number_of_fields_response(char *buffer, char* msg_type, client_t *clien
     // Set a response back to the client.
     bzero(buffer, MAX_BUFFER_SIZE);
     serialize_msg_NF_response(buffer, COUNT_OF_FIELDS);
-    printf("Sent the count of available fields to player - %s\n", client->player_name);
+    printf("Sent the count of available fields to player - %s\n", from_who(client));
 }
 
 void field_info_response(char *buffer, char* msg_type, client_t *client) {
     int chose;
 
     deserialize_msg_FI(buffer, &chose);
-    printf("Player %s chose to get more info about field - %d\n", client->player_name, chose);
+    printf("Player %s chose to get more info about field - %d\n", from_who(client), chose);
     
-    // use chose-1 to access field from fields arr.
-    //
+    // Set a response back to the client.
+    bzero(buffer, MAX_BUFFER_SIZE);
+    serialize_msg_FI_response(buffer, fields[chose-1]);
 }
 
 void handle_message(char *buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN] = { buffer[0], buffer[1], '\0' };
-    printf("Received msg_type - %s from player - %s\n", msg_type, client->player_name);
+    buffer = buffer + 3; // Skip the msg_type. The return mesage will always be the same msg_type.
+    printf("Received message of type - %s from player - %s\n", msg_type, from_who(client));
 
     if (strcmp(msg_type, "CG") == 0) {
         create_game_response(buffer, msg_type, client);
@@ -153,6 +163,7 @@ int main(int argc, char **argv) {
     client->address     = client_addr;
     client->sock_fd     = client_socket;
     client->player_id   = player_id++;
+    strcpy(client->ip, ip_addr(client_addr));
 
     handle_client(client);
 
@@ -172,20 +183,20 @@ void init_fields() {
     myfield->field = (struct Field*)calloc(sizeof(struct Field), 1);
     myfield->field->ID = 1;
     strcpy(myfield->field->name, "Grand Tour");
+    myfield->field->Width = 46;
     myfield->field->Height = 12;
-    myfield->field->ID = 46;
 
     myfield->start_line = (struct Line*)calloc(sizeof(struct Line), 1);
-    myfield->start_line->beggining.x = 15;
-    myfield->start_line->beggining.y = 2;
-    myfield->start_line->end.x = 15;
-    myfield->start_line->end.y = 5;
+    myfield->start_line->beggining.x = 15.1;
+    myfield->start_line->beggining.y = 2.1;
+    myfield->start_line->end.x = 15.1;
+    myfield->start_line->end.y = 5.1;
 
     myfield->main_line = (struct Line*)calloc(sizeof(struct Line), 1);
-    myfield->main_line->beggining.x = 10;
-    myfield->main_line->beggining.y = 5;
-    myfield->main_line->end.x = 25;
-    myfield->main_line->end.y = 6;
+    myfield->main_line->beggining.x = 10.1;
+    myfield->main_line->beggining.y = 5.1;
+    myfield->main_line->end.x = 25.1;
+    myfield->main_line->end.y = 6.1;
 
     myfield->n_extra_lines = 0;
 
