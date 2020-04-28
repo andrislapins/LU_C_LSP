@@ -26,13 +26,15 @@
 
 #include "protocol.h"
 
-#define PORT 9999
 #define IP_LEN 16
+#define PORT 9999
 #define MAX_CLIENTS 4
-#define MAX_BUFFER_SIZE 257
-#define COUNT_OF_FIELDS 1
 
 // These lengths are [useful data]+1 size because of the need to keep last element \0.
+#define MAX_BUFFER_SIZE 257
+#define DIGITS_LEN 5 // To (de)serilaize digits of length 4.
+#define COUNT_OF_FIELDS 1
+
 #define MSG_TYPE_LEN 3
 #define PLAYER_NAME_LEN 31
 #define PLAYER_PASS_LEN 11

@@ -10,8 +10,7 @@ int get_number_of_fields(char* buffer, client_t *myclient, field_t *myfield, int
     int n_field_ids, chose;
     ssize_t data_n;
     char msg_type[] = "NF";
-    int n_digits = 5; // EXP: Expecting the entered field id contain 4 digits. +1 is for \0 character.
-    char *num_str = (char*)calloc(n_digits, 1);
+    char *num_str = (char*)calloc(DIGITS_LEN, 1);
 
     // Serialize the data.
     bzero(buffer, MAX_BUFFER_SIZE);
@@ -29,10 +28,10 @@ int get_number_of_fields(char* buffer, client_t *myclient, field_t *myfield, int
         err_die("Could not receive message of type NUMBER OF FIELDS!");
     }
 
-    deserialize_msg_NF_response(buffer, &n_field_ids);
+    deserialize_msg_NF_response(buffer, &(n_field_ids));
 
     printf("Choose a field in range from 1 to %d to get more info: ", n_field_ids);
-    fgets(num_str, n_digits, stdin);
+    fgets(num_str, DIGITS_LEN, stdin);
 
     chose = atoi(num_str);
     if (chose <= 0 || chose > n_field_ids) {
@@ -57,7 +56,11 @@ int get_number_of_fields(char* buffer, client_t *myclient, field_t *myfield, int
         err_die("Could not receive message of type FIELD INFO!");
     }
 
+    print_array_in_hex("buffer before", buffer, MAX_BUFFER_SIZE);
+
     deserialize_msg_FI_response(buffer, myfield);
+
+    print_array_in_hex("buffer after", buffer, MAX_BUFFER_SIZE);
 
     printf("Field ID: %d\n", myfield->field->ID);
     printf("Field name: %s\n", myfield->field->name);

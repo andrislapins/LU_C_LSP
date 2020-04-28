@@ -25,7 +25,7 @@ char *from_who(client_t *client) {
     return client->ip;
 }
 
-void create_game_response(char *buffer, char *msg_type, client_t *client) {
+void create_game_response(char *buffer, client_t *client) {
     deserialize_msg_CG(buffer, client);
 
     client->curr_game_id = game_id++;
@@ -44,14 +44,14 @@ void create_game_response(char *buffer, char *msg_type, client_t *client) {
     serialize_msg_CG_response(buffer, client);
 }
 
-void get_number_of_fields_response(char *buffer, char* msg_type, client_t *client) {
+void get_number_of_fields_response(char *buffer, client_t *client) {
     // Set a response back to the client.
     bzero(buffer, MAX_BUFFER_SIZE);
     serialize_msg_NF_response(buffer, COUNT_OF_FIELDS);
     printf("Sent the count of available fields to player - %s\n", from_who(client));
 }
 
-void field_info_response(char *buffer, char* msg_type, client_t *client) {
+void field_info_response(char *buffer, client_t *client) {
     int chose;
 
     deserialize_msg_FI(buffer, &chose);
@@ -60,19 +60,23 @@ void field_info_response(char *buffer, char* msg_type, client_t *client) {
     // Set a response back to the client.
     bzero(buffer, MAX_BUFFER_SIZE);
     serialize_msg_FI_response(buffer, fields[chose-1]);
+
+    // bug
+    printf("field %d; field %f\n", fields[chose-1]->field->Width, fields[chose-1]->main_line->beggining.x);
+    printf("field %d; field %f\n", fields[chose-1]->field->Height, fields[chose-1]->main_line->beggining.y);
 }
 
 void handle_message(char *buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN] = { buffer[0], buffer[1], '\0' };
-    buffer = buffer + 3; // Skip the msg_type. The return mesage will always be the same msg_type.
+    buffer = buffer + 3; // Pass the point of buffer after msg_type.
     printf("Received message of type - %s from player - %s\n", msg_type, from_who(client));
 
     if (strcmp(msg_type, "CG") == 0) {
-        create_game_response(buffer, msg_type, client);
+        create_game_response(buffer, client);
     } else if (strcmp(msg_type, "NF") == 0) {
-        get_number_of_fields_response(buffer, msg_type, client);
+        get_number_of_fields_response(buffer, client);
     } else if (strcmp(msg_type, "FI") == 0) {
-        field_info_response(buffer, msg_type, client);
+        field_info_response(buffer, client);
     } else {
         printf("This message type is unknown!\n");
         // NOTE: Send an "error type" to kill the client?
@@ -95,14 +99,15 @@ void handle_client(client_t *client) {
         if (data_n > 0) {
             if (strlen(buffer) > 0) {
                 handle_message(buffer, client);
-                data_n = send(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
+                // Passing buffer + 3 in order to NOT send the msg_type.
+                data_n = send(client->sock_fd, buffer+3, MAX_BUFFER_SIZE, 0);
                 if (data_n < 0) {
                     printf("An error occurred sending a message!\n");
                     leave_flag = 1;
                 }
             }
         } else if (data_n == 0) {
-            printf("Lost connection with %s\n", client->player_name);
+            printf("Lost connection with %s\n", from_who(client));
             leave_flag = 1;
         } else {
             printf("An error occurred receiving a message!\n");
@@ -182,6 +187,7 @@ void init_fields() {
 
     myfield->field = (struct Field*)calloc(sizeof(struct Field), 1);
     myfield->field->ID = 1;
+    memset(myfield->field->name, 0, FIELD_NAME_LEN);
     strcpy(myfield->field->name, "Grand Tour");
     myfield->field->Width = 46;
     myfield->field->Height = 12;
