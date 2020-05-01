@@ -9,23 +9,23 @@
 // For log_ouput I should have a seperate func to create/overwrite log file.
 // Use the special flag handling library!
 
-// Global structures.
-track_node_t *tracks_start = NULL;
-static unsigned int track_count = 0;
-static int track_id = 0;
-
+// Lists of the main types for manipulating w/ game data.
 client_node_t *clients_start = NULL;
 static unsigned int client_count = 0;
 static int client_id = 0;
+
+track_node_t *tracks_start = NULL;
+static unsigned int track_count = 0;
+static int track_id = 0;
 
 game_node_t *games_start = NULL;
 static unsigned int game_count = 0;
 static int game_id = 0;
 
-// Sockets.
+// Sockets. // NOTE: (do smth according to thread practices)
 int listen_socket, client_socket;
 
-// Default flag values.
+// Variables for global flag storing.
 FILE *output;
 char *ip;
 int port;
@@ -37,17 +37,16 @@ void help();
 
 // Global structure initialization prototypes.
 void init_tracks_once();
-game_t *init_game(int field);
-client_t *init_client(int client_socket, struct sockaddr_in client_addr);
+void init_game(game_t **game, client_t *client);
+void init_client(client_t **client, int client_socket, struct sockaddr_in client_addr);
 
 void create_game_response(char *buffer, client_t *client) {
     game_t *game;
 
-    // Handling the message from a client.
     deserialize_msg_CG(buffer, client);
 
     // Create a new game.
-    game = init_game(client->game->track->field->ID);
+    init_game(&game, client);
 
     // Assign the new game to the client, and create a password for the client.
     client->game = game;
@@ -57,7 +56,7 @@ void create_game_response(char *buffer, client_t *client) {
     bzero(buffer, MAX_BUFFER_SIZE);
     serialize_msg_CG_response(buffer, client);
 
-    log_create_game_response(stdout, client);
+    log_create_game_response(output, client);
 }
 
 void get_number_of_fields_response(char *buffer, client_t *client) {
@@ -65,7 +64,7 @@ void get_number_of_fields_response(char *buffer, client_t *client) {
     bzero(buffer, MAX_BUFFER_SIZE);
     serialize_msg_NF_response(buffer, track_count);
 
-    log_get_number_of_fields_response(stdout, client);
+    log_get_number_of_fields_response(output, client);
 }
 
 void field_info_response(char *buffer, client_t *client) {
@@ -78,7 +77,7 @@ void field_info_response(char *buffer, client_t *client) {
     bzero(buffer, MAX_BUFFER_SIZE);
     serialize_msg_FI_response(buffer, get_track_by_id(tracks_start, chose));
 
-    log_field_info_response(stdout, client, &chose);
+    log_field_info_response(output, client, &chose);
 }
 
 void list_games_response(char *buffer, client_t *client) {
@@ -86,7 +85,7 @@ void list_games_response(char *buffer, client_t *client) {
     bzero(buffer, MAX_BUFFER_SIZE);
     serialize_msg_LI_response(buffer, game_count);
 
-    log_list_games_response(stdout, client);
+    log_list_games_response(output, client);
 }
 
 void game_info_response(char *buffer, client_t *client) {
@@ -96,7 +95,7 @@ void game_info_response(char *buffer, client_t *client) {
 void handle_message(char *buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN] = { buffer[0], buffer[1], '\0' };
     buffer = buffer + 3; // Pass the point of buffer after msg_type.
-    log_recvd_msg_type(stdout, client, msg_type);
+    log_recvd_msg_type(output, client, msg_type);
 
     if (strcmp(msg_type, "CG") == 0) {
         create_game_response(buffer, client);
@@ -116,17 +115,21 @@ void handle_message(char *buffer, client_t *client) {
 }
 
 void handle_client(client_t *client) {
-    char *buffer = (char*)malloc(MAX_BUFFER_SIZE * sizeof(*buffer));
+    char *buffer;
     int leave_flag = 0;
     int data_n;
     client_count++;
+
+    buffer = (char*)malloc(MAX_BUFFER_SIZE);
+    if (buffer == NULL) {
+        err_die(output, "Could not allocate memory for a buffer!");
+    }
+    memset(buffer, 0, MAX_BUFFER_SIZE);
 
     while(1) {
         if (leave_flag) {
             break;
         }
-
-        bzero(buffer, MAX_BUFFER_SIZE);
 
         data_n = recv(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
         if (data_n > 0) {
@@ -146,6 +149,8 @@ void handle_client(client_t *client) {
             printf("An error occurred receiving a message!\n");
             leave_flag = 1;
         }
+
+        memset(buffer, 0, MAX_BUFFER_SIZE);
     }
 
     close(client->sock_fd);
@@ -164,6 +169,7 @@ int main(int argc, char **argv) {
 
     signal(SIGINT, handle_sigint);
 
+    // Default flag values.
     output = stdout;
     ip     = "127.0.0.1";
     port   = PORT;
@@ -193,29 +199,29 @@ int main(int argc, char **argv) {
     option = 1;
     err = setsockopt(listen_socket, SOL_SOCKET, SO_REUSEPORT | SO_REUSEADDR, (char*)&option, sizeof(option));
     if (err < 0) {
-        err_die(stdout, "Setting options on socket failed!");
+        err_die(output, "Setting options on socket failed!");
     }
 
     err = bind(listen_socket, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
     if (err < 0) {
-        err_die(stdout, "Binding failed!");
+        err_die(output, "Binding failed!");
     }
 
     err = listen(listen_socket, MAX_CLIENTS);
     if (err < 0) {
-        err_die(stdout, "Listening failed!");
+        err_die(output, "Listening failed!");
     }
 
     // === Server/Game has started === //
 
-    printf("Server is on...\n");
+    fprintf(output, "%sServer is on...%s\n", ANSI_BLINK, ANSI_RESET_ALL);
 
     init_tracks_once();
 
     // Initiliaze various client values.
     client_addr_len = sizeof(client_addr);
     client_socket   = accept(listen_socket, (struct sockaddr*)&client_addr, &client_addr_len);
-    client          = init_client(client_socket, client_addr);
+    init_client(&client, client_socket, client_addr);
 
     // NOTE: Manage in a thread.
     handle_client(client);
@@ -229,6 +235,7 @@ int main(int argc, char **argv) {
 /* === Non-communication specific/ Helper functions === */
 
 void handle_sigint(int sig) {
+    fprintf(output, "%s", ANSI_RESET_ALL);
     shutdown(listen_socket, SHUT_RDWR);
     shutdown(client_socket, SHUT_RDWR);
     printf("-Caught signal - %d\n", sig);
@@ -250,29 +257,32 @@ void help() {
 // NOTE:? Make somehow these fields read-only (can write to their mem pool, 
 // but can not change the pointers).
 void init_tracks_once() {
-    // Initialize a track.
-    track_t *track = (track_t*)calloc(1, sizeof(track_t));
+    track_t *track = (track_t*)malloc(sizeof(track_t));
     if (track == NULL) {
-        err_die(stdout, "Could not allocate memory for a track!");
+        err_die(output, "Could not allocate memory for a track!");
     }
+    memset(track, 0, sizeof(track_t));
 
     // Initialize the track's field.
-    track->field = (struct Field*)calloc(1, sizeof(struct Field));
+    track->field = (struct Field*)malloc(sizeof(struct Field));
     if (track == NULL) {
-        err_die(stdout, "Could not allocate memory for a field!");
+        err_die(output, "Could not allocate memory for a field!");
     }
+    memset(track->field, 0, sizeof(struct Field));
 
-    track->field->ID        = ++track_id; // Increment track ID.
+    track->field->ID        = ++track_id;
     track->field->Width     = 46;
     track->field->Height    = 12;
+    
     memset(track->field->name, 0, FIELD_NAME_LEN);
     strcpy(track->field->name, "Grand Tour");
 
     // Initialize the track's start line.
-    track->start_line = (struct Line*)calloc(1, sizeof(struct Line));
+    track->start_line = (struct Line*)malloc(sizeof(struct Line));
     if (track->start_line == NULL) {
-        err_die(stdout, "Could not allocate memory for a field's start line!");
+        err_die(output, "Could not allocate memory for a field's start line!");
     }
+    memset(track->start_line, 0, sizeof(struct Line));
 
     track->start_line->beggining.x  = 15.1;
     track->start_line->beggining.y  = 2.1;
@@ -280,10 +290,11 @@ void init_tracks_once() {
     track->start_line->end.y        = 5.1;
 
     // Initialize the track's main line.
-    track->main_line = (struct Line*)calloc(1, sizeof(struct Line));
+    track->main_line = (struct Line*)malloc(sizeof(struct Line));
     if (track->main_line == NULL) {
-        err_die(stdout, "Could not allocate memory for a field's main line!");
+        err_die(output, "Could not allocate memory for a field's main line!");
     }
+    memset(track->main_line, 0, sizeof(struct Line));
 
     track->main_line->beggining.x   = 10.1;
     track->main_line->beggining.y   = 5.1;
@@ -294,85 +305,101 @@ void init_tracks_once() {
     track->n_extra_lines            = 0;
 
     // Save this track in the global tracks list.
-    push_track(tracks_start, track);
+    track_count++;
+    push_track(&tracks_start, &track);
 }
 
-game_t *init_game(int chosen_field_id) {
-    game_t *new_game;
-    
-    // Initialize the game.
-    new_game = (game_t*)calloc(1, sizeof(game_t));
-    if (new_game == NULL) {
-        err_die(stdout, "Could not allocate memory for game!");
+void init_game(game_t **game, client_t *client) {
+    *game = (game_t*)malloc(sizeof(game_t));
+    if (*game == NULL) {
+        err_die(output, "Could not allocate memory for game!");
     }
+    memset(*game, 0, sizeof(game_t));
 
-    new_game->ID                        = ++game_id;
-    new_game->game_h->status            = 0;
-    new_game->game_h->WinnerPlayerID    = 0;
-    memset(new_game->game_h->name, 0, GAME_NAME_LEN);
+    (*game)->ID                        = ++game_id;
+
+    (*game)->game_h = (struct Game*)malloc(sizeof(struct Game));
+    memset((*game)->game_h, 0, sizeof(struct Game));
+
+    (*game)->game_h->status            = 0;
+    (*game)->game_h->WinnerPlayerID    = 0;
+    memset((*game)->game_h->name, 0, GAME_NAME_LEN);
+    strcpy((*game)->game_h->name, client->game->game_h->name);
 
     // Save the chosen track for the new game.
-    new_game->track = get_track_by_id(tracks_start, chosen_field_id);
+    (*game)->track = (track_t*)malloc(sizeof(track_t));
+    memset((*game)->track, 0, sizeof(track_t));
+
+    (*game)->track = get_track_by_id(tracks_start, client->game->track->field->ID);
 
     // Save this game in the global games list.
-    push_game(games_start, new_game);
-    return new_game;
+    game_count++;
+    push_game(&games_start, game);
 }
 
-client_t *init_client(int client_socket, struct sockaddr_in client_addr) {
-    // Initialize the client.
-    client_t *client = (client_t*)malloc(sizeof(client_t) * sizeof(*client));
-    if (client == NULL) {
-        err_die(stdout, "Could not allocate memory for a client!");
+void init_client(client_t **client, int client_socket, struct sockaddr_in client_addr) {
+    *client = (client_t*)malloc(sizeof(client_t));
+    if (*client == NULL) {
+        err_die(output, "Could not allocate memory for a client!");
     }
+    memset(*client, 0, sizeof(client_t));
 
     // Initialize the client's socket values.
-    client->address      = client_addr;
-    client->sock_fd      = client_socket;
-    strcpy(client->ip, ip_addr(client_addr));
+    (*client)->address      = client_addr;
+    (*client)->sock_fd      = client_socket;
+    memset((*client)->ip, 0, sizeof(IP_LEN));
+    strcpy((*client)->ip, ip_addr(client_addr));
 
     // Initialize the client's player struct.
-    client->player = (struct Player_info*)malloc(sizeof(struct Player_info));
-    if (client->player == NULL) {
-        err_die(stdout, "Could not allocate memory for client's player!");
+    (*client)->player = (struct Player_info*)malloc(sizeof(struct Player_info));
+    if ((*client)->player == NULL) {
+        err_die(output, "Could not allocate memory for client's player!");
     }
+    memset((*client)->player, 0, sizeof(struct Player_info));
 
-    client->player->ID   = ++client_id; 
+    (*client)->player->ID = ++client_id;
+    memset((*client)->player->name, 0, GAME_NAME_LEN);
 
     // Initialize the client's game struct.
-    client->game = (game_t*)malloc(sizeof(game_t));
-    if (client->game == NULL) {
-        err_die(stdout, "Could not allocate memory for client's game!");
+    (*client)->game = (game_t*)malloc(sizeof(game_t));
+    if ((*client)->game == NULL) {
+        err_die(output, "Could not allocate memory for client's game!");
     }
+    memset((*client)->game, 0, sizeof(game_t));
 
-    client->game->game_h = (struct Game*)malloc(sizeof(struct Game));
-    if (client->game->game_h == NULL) {
-        err_die(stdout, "Could not allocate memory for client's game header!");
+    (*client)->game->game_h = (struct Game*)malloc(sizeof(struct Game));
+    if ((*client)->game->game_h == NULL) {
+        err_die(output, "Could not allocate memory for client's game header!");
     }
+    memset((*client)->game->game_h, 0, sizeof(struct Game));
 
     // Initialize the client's game track.
-    client->game->track = (track_t*)malloc(sizeof(track_t));
-    if (client->game->track == NULL) {
-        err_die(stdout, "Could not allocate memory for client's game track!");
+    (*client)->game->track = (track_t*)malloc(sizeof(track_t));
+    if ((*client)->game->track == NULL) {
+        err_die(output, "Could not allocate memory for client's game track!");
     }
+    memset((*client)->game->track, 0, sizeof(track_t));
 
-    client->game->track->field = (struct Field*)malloc(sizeof(struct Field));
-    if (client->game->track->field == NULL) {
-        err_die(stdout, "Could not allocate memory for client's game track field!");
+    (*client)->game->track->field = (struct Field*)malloc(sizeof(struct Field));
+    if ((*client)->game->track->field == NULL) {
+        err_die(output, "Could not allocate memory for client's game track field!");
     }
+    memset((*client)->game->track->field, 0, sizeof(struct Field));
 
     // Initialize the client's game track lines.
-    client->game->track->start_line = (struct Line*)malloc(sizeof(struct Line));
-    if (client->game->track->start_line == NULL) {
-        err_die(stdout, "Could not allocate memory for client's game track start line!");
+    (*client)->game->track->start_line = (struct Line*)malloc(sizeof(struct Line));
+    if ((*client)->game->track->start_line == NULL) {
+        err_die(output, "Could not allocate memory for client's game track start line!");
     }
+    memset((*client)->game->track->start_line, 0, sizeof(struct Line));
 
-    client->game->track->main_line = (struct Line*)malloc(sizeof(struct Line));
-    if (client->game->track->main_line == NULL) {
-        err_die(stdout, "Could not allocate memory for client's game track main line!");
+    (*client)->game->track->main_line = (struct Line*)malloc(sizeof(struct Line));
+    if ((*client)->game->track->main_line == NULL) {
+        err_die(output, "Could not allocate memory for client's game track main line!");
     }
+    memset((*client)->game->track->main_line, 0, sizeof(struct Line));
 
     // Save this client in the global clients list.
-    push_client(clients_start, client);
-    return client;
+    client_count++;
+    push_client(&clients_start, client);
 }

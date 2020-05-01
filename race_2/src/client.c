@@ -191,6 +191,7 @@ int main(int argc, char **argv) {
     // === Client/Game has started ===
 
     printf("Welcome to the best race game EVER!\n");
+    printf("\a\a\a\a\n");
 
     // Initialize the buffer.
     buffer = (char*)calloc(1, MAX_BUFFER_SIZE);

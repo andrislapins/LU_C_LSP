@@ -7,28 +7,28 @@
 
 /* Linked List for Clients */
 
-void push_client(client_node_t *head, client_t *value) {
+void push_client(client_node_t **head, client_t **value) {
     client_node_t *current;
     
-    if (head == NULL) {
-        head = (client_node_t*)calloc(1, sizeof(client_node_t));
-        head->client = value;
-        head->next_client = NULL;
+    if (*head == NULL) {
+        *head = (client_node_t*)malloc(sizeof(client_node_t));
+        (*head)->client = *value;
+        (*head)->next_client = NULL;
         return;
     }
 
-    current = head;
+    current = *head;
 
     while (current->next_client != NULL) {
         current = current->next_client;
     }
 
-    current->next_client = (client_node_t*)calloc(1, sizeof(client_node_t));
+    current->next_client = (client_node_t*)malloc(sizeof(client_node_t));
     if (current->next_client == NULL) {
         err_die(stdout, "Could not allocate memory for next client!");
     }
 
-    current->client = value;
+    current->client = *value;
     current->next_client->next_client = NULL;
 }
 
@@ -122,28 +122,28 @@ client_t *get_client_by_id(client_node_t *head, int want_id) {
 
 /* Linked List for Tracks */
 
-void push_track(track_node_t *head, track_t *value) {
+void push_track(track_node_t **head, track_t **value) {
     track_node_t *current;
     
-    if (head == NULL) {
-        head = (track_node_t*)calloc(1, sizeof(track_node_t));
-        head->track = value;
-        head->next_track = NULL;
+    if (*head == NULL) {
+        *head = (track_node_t*)malloc(sizeof(track_node_t));
+        (*head)->track = *value;
+        (*head)->next_track = NULL;
         return;
     }
 
-    current = head;
+    current = *head;
 
     while (current->next_track != NULL) {
         current = current->next_track;
     }
 
-    current->next_track = (track_node_t*)calloc(1, sizeof(track_node_t));
+    current->next_track = (track_node_t*)malloc(sizeof(track_node_t));
     if (current->next_track == NULL) {
         err_die(stdout, "Could not allocate memory for next track!");
     }
 
-    current->track = value;
+    current->track = *value;
     current->next_track->next_track = NULL;
 }
 
@@ -237,28 +237,28 @@ track_t *get_track_by_id(track_node_t *head, int want_id) {
 
 /* Linked List for Games */
 
-void push_game(game_node_t *head, game_t *value) {
+void push_game(game_node_t **head, game_t **value) {
     game_node_t *current;
     
-    if (head == NULL) {
-        head = (game_node_t*)calloc(1, sizeof(game_node_t));
-        head->game = value;
-        head->next_game = NULL;
+    if (*head == NULL) {
+        *head = (game_node_t*)malloc(sizeof(game_node_t));
+        (*head)->game = *value;
+        (*head)->next_game = NULL;
         return;
     }
 
-    current = head;
+    current = *head;
 
     while (current->next_game != NULL) {
         current = current->next_game;
     }
 
-    current->next_game = (game_node_t*)calloc(1, sizeof(game_node_t));
+    current->next_game = (game_node_t*)malloc(sizeof(game_node_t));
     if (current->next_game == NULL) {
         err_die(stdout, "Could not allocate memory for next game!");
     }
 
-    current->game = value;
+    current->game = *value;
     current->next_game->next_game = NULL;
 }
 

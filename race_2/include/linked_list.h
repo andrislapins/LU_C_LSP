@@ -29,7 +29,7 @@ typedef struct game_node {
 
 /* Linked List functions for Clients */
 
-void push_client(client_node_t *head, client_t *value);
+void push_client(client_node_t **head, client_t **value);
 char *pop_client(client_node_t *head);
 char *remove_last_client(client_node_t *head);
 char *remove_by_client_id(client_node_t *head, int del_id);
@@ -37,7 +37,7 @@ client_t *get_client_by_id(client_node_t *head, int want_id);
 
 /* Linked List functions for Tracks */
 
-void push_track(track_node_t *head, track_t *value);
+void push_track(track_node_t **head, track_t **value);
 char *pop_track(track_node_t *head);
 char *remove_last_track(track_node_t *head);
 char *remove_by_track_id(track_node_t *head, int del_id);
@@ -45,7 +45,7 @@ track_t *get_track_by_id(track_node_t *head, int want_id);
 
 /* Linked List functions for Games */
 
-void push_game(game_node_t *head, game_t *value);
+void push_game(game_node_t **head, game_t **value);
 char *pop_game(game_node_t *head);
 char *remove_last_game(game_node_t *head);
 char *remove_by_game_id(game_node_t *head, int del_id);

@@ -9,10 +9,8 @@ char na[] = "N/A";
 void err_die(FILE *fp, char* err_msg) {
     log_time_header(fp);
 
-    printf("%s", ANSI_RED);
-    printf("ERROR: %s\n", err_msg);
-    printf("(errno = %d): %s\n", errno, strerror(errno));
-    printf("%s", ANSI_NORMAL);
+    fprintf(fp, "%sERROR: %s ", ANSI_RED, err_msg);
+    fprintf(fp, "(errno = %d): %s%s\n", errno, strerror(errno), ANSI_RESET_ALL);
 
     exit(EXIT_FAILURE);
 }

@@ -18,7 +18,7 @@
 
 #include "protocol.h"
 
-#define IP_LEN 16
+#define IP_LEN 17
 #define PORT 9999
 #define MAX_CLIENTS 4
 
@@ -33,11 +33,14 @@
 
 #define FIELD_NAME_LEN 20
 
-// Terminal output color definitions.
-// EXP: [x; (0-regular, 1-bold)
-#define ANSI_NORMAL "\033[0;0m"
-#define ANSI_BOLD "\033[1;0m"
-#define ANSI_RED "\033[0;31m"
+// Terminal output format definitions.
+// EXP: [x; (0-regular, 1-bold): \e == \033
+#define ANSI_RESET_ALL  "\e[0m"
+#define ANSI_BOLD       "\e[1m"
+#define ANSI_BLINK      "\e[5m"
+
+#define ANSI_RED "\e[31m"
+#define ANSI_GREEN "\e[32m"
 
 // NOTE:? Could I typdef(verb) all protocol structs and safely use/manage them.
 
