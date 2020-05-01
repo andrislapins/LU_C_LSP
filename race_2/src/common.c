@@ -1,6 +1,7 @@
 #include "../include/common.h"
 #include "../include/protocol.h"
 #include "../include/serialization.h"
+#include "../include/log_messages.h"
 
 char ip[IP_LEN];
 
@@ -40,14 +41,13 @@ void generate_password(client_t *client) {
     a[64] = '#';
     a[65] = '&';
 
-    for (i = 0; i < PLAYER_PASS_LEN-1; i++) {
+    for (i = 0; i < CLIENT_PASS_LEN-1; i++) {
         r = rand() % 65;
-        client->player_pass[i] = a[r];
+        client->password[i] = a[r];
     }
-    client->player_pass[i] = '\0';
+    client->password[i] = '\0';
 
-    printf("Player %s obtained password - %s\n", 
-        client->player_name, client->player_pass);
+    log_pass_generated(stdout, client);
 }
 
 char *ip_addr(struct sockaddr_in addr) {
@@ -64,4 +64,12 @@ char *ip_addr(struct sockaddr_in addr) {
 void get_group_n_id(int *base, int *group, int *index) {
     *group = *base / 100;
     *index = *base % 100;
+}
+
+char *from_who(client_t *client) {
+    if (strlen(client->player->name) != 0) {
+        return client->player->name;
+    }
+
+    return "N/A\0";
 }

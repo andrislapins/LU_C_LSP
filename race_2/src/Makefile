@@ -6,7 +6,7 @@ ODIR=obj
 CC=gcc
 CFLAGS=-g -Wall -I$(IDIR)
 
-HEAD=$(IDIR)/protocol.h $(IDIR)/common.h $(IDIR)/serialization.h $(IDIR)/my_strings.h
+HEAD=$(IDIR)/protocol.h $(IDIR)/common.h $(IDIR)/serialization.h
 
 all: client.exe server.exe
 
