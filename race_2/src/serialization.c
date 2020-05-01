@@ -83,8 +83,8 @@ void serialize_msg_CG(char *buffer, char *msg_type, char *player_name, char *gam
 
 void deserialize_msg_CG(char *buffer, client_t *client) {
     buffer = deserialize_string(buffer, client->player->name, CLIENT_NAME_LEN);
-    buffer = deserialize_string(buffer, client->game->game->name, GAME_NAME_LEN);
-    buffer = deserialize_int(buffer, &(client->game->field->field->ID));
+    buffer = deserialize_string(buffer, client->game->game_h->name, GAME_NAME_LEN);
+    buffer = deserialize_int(buffer, &(client->game->track->field->ID));
 }
 
 void serialize_msg_CG_response(char *buffer, client_t *client) {
@@ -104,9 +104,7 @@ void serialize_msg_NF(char *buffer, char *msg_type) {
     buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
 }
 
-void deserialize_msg_NF() { // Unused, but leave for the sake of ordering things.
-    // empty.
-}
+void deserialize_msg_NF(); // Unused, but leave for the sake of ordering things.
 
 void serialize_msg_NF_response(char *buffer, int count_of_fields) {
     buffer = serialize_int(buffer, &(count_of_fields));

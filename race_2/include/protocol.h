@@ -10,7 +10,7 @@ struct Coordinates
 struct Game
 {
     int status; //(0- WAITING_PLAYERS, 1- STARTED, -1- ENDED).
-    char name[20];// Uzvarētāja spēlētāja ID, vai -1, ja tāda vēl nav.
+    char name[20]; // Uzvarētāja spēlētāja ID, vai -1, ja tāda vēl nav.
     int WinnerPlayerID;
 };
 

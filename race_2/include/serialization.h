@@ -7,7 +7,7 @@
 char *serialize_int(char *buffer, int *value);
 char* deserialize_int(char *buffer, int *value);
 
-char *serialize_float(char *buffer, float *value);
+char *serialize_float(char *buffer, float value);
 char *deserialize_float(char *buffer, float *value);
 
 char *serialize_string(char *buffer, char *value, int len);
@@ -28,7 +28,17 @@ void deserialize_msg_NF_response(char *buffer, int *n_field_ids);
 
 void serialize_msg_FI(char *buffer, char *msg_type, int chose);
 void deserialize_msg_FI(char *buffer, int *chose);
-void serialize_msg_FI_response(char *buffer,field_t *myfield);
-void deserialize_msg_FI_response(char *buffer,field_t *myfield);
+void serialize_msg_FI_response(char *buffer, track_t *track);
+void deserialize_msg_FI_response(char *buffer, track_t *track);
+
+void serialize_msg_LI(char *buffer, char *msg_type);
+void deserialize_msg_LI(); // Unused, but leave for the sake of ordering things.
+void serialize_msg_LI_response(char *buffer, int count_of_games);
+void deserialize_msg_LI_response(char *buffer, int *n_game_ids);
+
+void serialize_msg_GI(char *buffer, char *msg_type, int chose);
+void deserialize_msg_GI(char *buffer, int *chose);
+void serialize_msg_GI_response(char *buffer);
+void deserialize_msg_GI_response(char *buffer);
 
 #endif

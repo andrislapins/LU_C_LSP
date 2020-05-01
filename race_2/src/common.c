@@ -4,10 +4,15 @@
 #include "../include/log_messages.h"
 
 char ip[IP_LEN];
+char na[] = "N/A";
 
-void err_die(char* err_msg) {
+void err_die(FILE *fp, char* err_msg) {
+    log_time_header(fp);
+
+    printf("%s", ANSI_RED);
     printf("ERROR: %s\n", err_msg);
     printf("(errno = %d): %s\n", errno, strerror(errno));
+    printf("%s", ANSI_NORMAL);
 
     exit(EXIT_FAILURE);
 }
@@ -71,5 +76,5 @@ char *from_who(client_t *client) {
         return client->player->name;
     }
 
-    return "N/A\0";
+    return na;
 }

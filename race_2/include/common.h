@@ -2,27 +2,19 @@
 #define _COMMON_H_
 
 #include <stdio.h>
-// For size_t, NULL, EXIT_SUCCESS, atoi(), malloc etc.
-#include <stdlib.h>
-#include <string.h>
-// For bzero() etc.
-#include <strings.h>
-// For _POSIX_VERSION etc.
-#include <unistd.h>
-// For symbol constants in case of error.
-#include <errno.h>
+#include <stdlib.h> // size_t, NULL, EXIT_SUCCESS, atoi(), malloc etc.
+#include <string.h> // memcpy(), strcmp() etc.
+#include <strings.h> // bzero() etc.
+#include <unistd.h> // _POSIX_VERSION etc.
+#include <errno.h> // symbol constants in case of error.
 #include <signal.h>
 #include <pthread.h>
 #include <time.h>
-
-// For pthread_mutex_t, pthread_cond_t etc.
-#include <sys/types.h>
+#include <getopt.h>
+#include <sys/types.h> // pthread_mutex_t, pthread_cond_t etc.
 #include <sys/socket.h>
-
-// For struct in_addr, sin_family, AF_INET etc.
-#include <netinet/in.h>
-// For inet_addr(), htonl() etc.
-#include <arpa/inet.h>
+#include <netinet/in.h> // struct in_addr, sin_family, AF_INET etc.
+#include <arpa/inet.h> // inet_addr(), htonl() etc.
 
 #include "protocol.h"
 
@@ -30,44 +22,55 @@
 #define PORT 9999
 #define MAX_CLIENTS 4
 
-// These lengths are [useful data]+1 size because of the need to keep last element \0.
-#define MAX_BUFFER_SIZE 257
+#define MAX_BUFFER_SIZE 256
 #define DIGITS_LEN 5 // To (de)serilaize digits of length 4.
-#define COUNT_OF_FIELDS 1
+#define COUNT_OF_FIELDS 1 // is this needed ?
 
 #define MSG_TYPE_LEN 3
-#define PLAYER_NAME_LEN 31
-#define PLAYER_PASS_LEN 11
-#define GAME_NAME_LEN 21
+#define CLIENT_NAME_LEN 30
+#define CLIENT_PASS_LEN 10
+#define GAME_NAME_LEN 20
 
-#define FIELD_NAME_LEN 21
+#define FIELD_NAME_LEN 20
 
-typedef struct {
-    int player_id;
-    char player_name[PLAYER_NAME_LEN];
-    char player_pass[PLAYER_PASS_LEN];
+// Terminal output color definitions.
+// EXP: [x; (0-regular, 1-bold)
+#define ANSI_NORMAL "\033[0;0m"
+#define ANSI_BOLD "\033[1;0m"
+#define ANSI_RED "\033[0;31m"
 
-    char curr_game_name[GAME_NAME_LEN];
-    int curr_game_id;
-    int chosen_field_id;
+// NOTE:? Could I typdef(verb) all protocol structs and safely use/manage them.
 
-    int sock_fd;
-    struct sockaddr_in address;
-    char ip[IP_LEN];
-} client_t;
-
-typedef struct {
+// Composite data structures of the race game.
+typedef struct track {
     struct Field *field;
     struct Line *start_line;
     struct Line *main_line;
     int n_extra_lines;
-} field_t;
+} track_t;
 
-// For handling errors and killing the process.
-void err_die(char* err_msg);
+typedef struct game{
+    int ID;
+    struct Game *game_h;
+    track_t *track;
+} game_t;
+
+typedef struct client {
+    struct Player_info *player;
+    char password[CLIENT_PASS_LEN];
+    char ip[IP_LEN];
+
+    game_t *game;
+
+    int sock_fd;
+    struct sockaddr_in address;
+} client_t;
+
+void err_die(FILE *fp, char* err_msg);
 void print_array_in_hex(char *name, void* arr, int len);
 void generate_password(client_t *client);
 char *ip_addr(struct sockaddr_in addr);
 void get_group_n_id(int *base, int *group, int *index);
+char *from_who(client_t *client);
 
 #endif

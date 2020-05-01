@@ -6,7 +6,11 @@ ODIR=obj
 CC=gcc
 CFLAGS=-g -Wall -I$(IDIR)
 
-HEAD=$(IDIR)/protocol.h $(IDIR)/common.h $(IDIR)/serialization.h
+HEAD=$(IDIR)/protocol.h $(IDIR)/common.h $(IDIR)/serialization.h \
+			$(IDIR)/linked_list.h $(IDIR)/log_messages.h
+
+ADD_OBJ=$(ODIR)/common.o $(ODIR)/serialization.o \
+		    $(ODIR)/linked_list.o $(ODIR)/log_messages.o
 
 all: client.exe server.exe
 
@@ -18,23 +22,26 @@ $(ODIR)/common.o: common.c $(HEAD)
 $(ODIR)/serialization.o: serialization.c $(HEAD)
 	$(CC) $(CFLAGS) -c -o $@ serialization.c
 
-$(ODIR)/my_strings.o: my_strings.c $(HEAD)
-	$(CC) $(CFLAGS) -c -o $@ my_strings.c
+$(ODIR)/linked_list.o: linked_list.c $(HEAD)
+	$(CC) $(CFLAGS) -c -o $@ linked_list.c
+
+$(ODIR)/log_messages.o: log_messages.c $(HEAD)
+	$(CC) $(CFLAGS) -c -o $@ log_messages.c
 
 # Client/Server object files.
-
-$(ODIR)/server.o: server.c $(HEAD)
-	$(CC) $(CFLAGS) -c -o $@ server.c
 
 $(ODIR)/client.o: client.c $(HEAD)
 	$(CC) $(CFLAGS) -c -o $@ client.c
 
+$(ODIR)/server.o: server.c $(HEAD)
+	$(CC) $(CFLAGS) -c -o $@ server.c
+
 # Client/Server executables.
 
-client.exe: $(ODIR)/client.o $(ODIR)/common.o $(ODIR)/serialization.o $(ODIR)/my_strings.o
+client.exe: client.o $(ADD_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
-server.exe: $(ODIR)/server.o $(ODIR)/common.o $(ODIR)/serialization.o $(ODIR)/my_strings.o
+server.exe: server.o $(ADD_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
