@@ -3,6 +3,7 @@
 #include "../include/serialization.h"
 
 /* int serialization/deserialization */
+
 char *serialize_int(char *buffer, int *value) {
     char *value_s = (char*)value;
     int len = sizeof(int);
@@ -23,6 +24,7 @@ char* deserialize_int(char *buffer, int *value) {
     return buffer + len;
 }
 /* float serialization/deserialization */
+
 char *serialize_float(char *buffer, float value) {
     int len = sizeof(float);
 
@@ -42,6 +44,7 @@ char *deserialize_float(char *buffer, float *value) {
 }
 
 /* string serialization/deserialization */
+
 char *serialize_string(char *buffer, char *value, int len) {
     for (int i = 0; i < len; i++) {
         buffer[i] = value[i];
@@ -59,6 +62,7 @@ char *deserialize_string(char *buffer, char *value, int len) {;
 /* === PROTOCOL TYPE SERIALIZATION/DESERIALIZATION === */
 
 /* struct Field serialization/deserialization */
+
 void serialize_field(char *buffer, struct Field *field) {
     buffer = serialize_int(buffer, &(field->ID));
     buffer = serialize_int(buffer, &(field->Height));
@@ -74,6 +78,7 @@ void deserialize_field(char *buffer, struct Field *field) {
 }
 
 /* msg CREATE GAME serialization/deserialization */
+
 void serialize_msg_CG(char *buffer, char *msg_type, char *player_name, char *game_name, int field_id) {
     buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
     buffer = serialize_string(buffer, player_name , CLIENT_NAME_LEN);
@@ -81,10 +86,10 @@ void serialize_msg_CG(char *buffer, char *msg_type, char *player_name, char *gam
     buffer = serialize_int(buffer, &(field_id));
 }
 
-void deserialize_msg_CG(char *buffer, client_t *client) {
+void deserialize_msg_CG(char *buffer, client_t *client, char *chosen_game_name, int *chosen_field_id) {
     buffer = deserialize_string(buffer, client->player->name, CLIENT_NAME_LEN);
-    buffer = deserialize_string(buffer, client->game->game_h->name, GAME_NAME_LEN);
-    buffer = deserialize_int(buffer, &(client->game->track->field->ID));
+    buffer = deserialize_string(buffer, chosen_game_name, GAME_NAME_LEN);
+    buffer = deserialize_int(buffer, chosen_field_id);
 }
 
 void serialize_msg_CG_response(char *buffer, client_t *client) {
@@ -100,11 +105,12 @@ void deserialize_msg_CG_response(char *buffer, client_t *client) {
 }
 
 /* msg NUMBER OF FIELDS serialization/deserialization */
+
 void serialize_msg_NF(char *buffer, char *msg_type) {
     buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
 }
 
-void deserialize_msg_NF(); // Unused, but leave for the sake of ordering things.
+void deserialize_msg_NF();
 
 void serialize_msg_NF_response(char *buffer, int count_of_fields) {
     buffer = serialize_int(buffer, &(count_of_fields));
@@ -115,6 +121,7 @@ void deserialize_msg_NF_response(char *buffer, int *n_field_ids) {
 }
 
 /* msg FIELD INFO serialization/deserialization */
+
 void serialize_msg_FI(char *buffer, char *msg_type, int chose) {
     buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
     buffer = serialize_int(buffer, &(chose));
@@ -157,13 +164,12 @@ void deserialize_msg_FI_response(char *buffer, track_t *track) {
 }
 
 /* msg LIST GAMES serialization/deserialization */
+
 void serialize_msg_LI(char *buffer, char *msg_type) {
     buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
 }
 
-void deserialize_msg_LI() { // Unused, but leave for the sake of ordering things.
-    // empty.
-}
+void deserialize_msg_LI();
 
 void serialize_msg_LI_response(char *buffer, int count_of_games) {
     buffer = serialize_int(buffer, &(count_of_games));
@@ -174,6 +180,7 @@ void deserialize_msg_LI_response(char *buffer, int *n_game_ids) {
 }
 
 /* msg GAME INFO serialization/deserialization */
+
 void serialize_msg_GI(char *buffer, char *msg_type, int chose);
 void deserialize_msg_GI(char *buffer, int *chose);
 void serialize_msg_GI_response(char *buffer);

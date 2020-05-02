@@ -6,15 +6,6 @@
 char ip[IP_LEN];
 char na[] = "N/A";
 
-void err_die(FILE *fp, char* err_msg) {
-    log_time_header(fp);
-
-    fprintf(fp, "%sERROR: %s ", ANSI_RED, err_msg);
-    fprintf(fp, "(errno = %d): %s%s\n", errno, strerror(errno), ANSI_RESET_ALL);
-
-    exit(EXIT_FAILURE);
-}
-
 void print_array_in_hex(char *name, void *arr, int len) {
     char *arr_p = arr;
 

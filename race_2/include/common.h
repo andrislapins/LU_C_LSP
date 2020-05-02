@@ -27,6 +27,7 @@
 #define COUNT_OF_FIELDS 1 // is this needed ?
 
 #define MSG_TYPE_LEN 3
+#define ERR_MSG_LEN 48
 #define CLIENT_NAME_LEN 30
 #define CLIENT_PASS_LEN 10
 #define GAME_NAME_LEN 20
@@ -47,8 +48,7 @@
 // Composite data structures of the race game.
 typedef struct track {
     struct Field *field;
-    struct Line *start_line;
-    struct Line *main_line;
+    struct Line *start_line, *main_line;
     int n_extra_lines;
 } track_t;
 
@@ -60,16 +60,13 @@ typedef struct game{
 
 typedef struct client {
     struct Player_info *player;
-    char password[CLIENT_PASS_LEN];
-    char ip[IP_LEN];
-
+    char *password, *ip;
     game_t *game;
 
     int sock_fd;
     struct sockaddr_in address;
 } client_t;
 
-void err_die(FILE *fp, char* err_msg);
 void print_array_in_hex(char *name, void* arr, int len);
 void generate_password(client_t *client);
 char *ip_addr(struct sockaddr_in addr);

@@ -4,12 +4,12 @@ LDIR=../lib
 ODIR=obj
 
 CC=gcc
-CFLAGS=-g -Wall -I$(IDIR)
+CFLAGS=-g -Wall -Werror -I$(IDIR)
 
 HEAD=$(IDIR)/protocol.h $(IDIR)/common.h $(IDIR)/serialization.h \
 			$(IDIR)/linked_list.h $(IDIR)/log_messages.h
 
-ADD_OBJ=$(ODIR)/common.o $(ODIR)/serialization.o \
+OTHER_OBJ=$(ODIR)/common.o $(ODIR)/serialization.o \
 		    $(ODIR)/linked_list.o $(ODIR)/log_messages.o
 
 all: client.exe server.exe
@@ -38,10 +38,10 @@ $(ODIR)/server.o: server.c $(HEAD)
 
 # Client/Server executables.
 
-client.exe: client.o $(ADD_OBJ)
+client.exe: client.o $(OTHER_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
-server.exe: server.o $(ADD_OBJ)
+server.exe: server.o $(OTHER_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:

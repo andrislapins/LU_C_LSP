@@ -3,15 +3,8 @@
 
 #include "common.h"
 
-// PLAN:?
-// 1. Copy/Write a good implementation from net. WRITE MY OWN. TRY.
-// 2. Have a node for every protocol which to hold globally
-// EXAMPLE: struct client_t_node { client_t client; client_t *next; };
+/* Protocol data type nodes with the use of linked lists. */
 
-// MEANWHILE - implement just the communication by sending dummy values
-// THEN - implement data structure that could be applied better.
-
-// Protocol data type nodes with the use of linked lists.
 typedef struct client_node {
     client_t *client;
     struct client_node *next_client;
@@ -27,28 +20,49 @@ typedef struct game_node {
     struct game_node *next_game;
 } game_node_t;
 
-/* Linked List functions for Clients */
+/* Typical LL function return values */
 
-void push_client(client_node_t **head, client_t **value);
-char *pop_client(client_node_t *head);
-char *remove_last_client(client_node_t *head);
-char *remove_by_client_id(client_node_t *head, int del_id);
-client_t *get_client_by_id(client_node_t *head, int want_id);
+enum result {
+    RGOOD   =  0, // Result Good.
+    MFAIL   = -1, // Memory allocation Failed.
+    HNULL   = -2, // Head is NULL.
+    NFND    = -3  // Not Found.
+};
 
-/* Linked List functions for Tracks */
+/* Pushing instnace to its LL */
 
-void push_track(track_node_t **head, track_t **value);
-char *pop_track(track_node_t *head);
-char *remove_last_track(track_node_t *head);
-char *remove_by_track_id(track_node_t *head, int del_id);
-track_t *get_track_by_id(track_node_t *head, int want_id);
+int push_client(client_node_t **head, client_t **value);
+int push_game(game_node_t **head, game_t **value);
+int push_track(track_node_t **head, track_t **value);
 
-/* Linked List functions for Games */
+/* Removing instance from the start of its LL */
 
-void push_game(game_node_t **head, game_t **value);
-char *pop_game(game_node_t *head);
-char *remove_last_game(game_node_t *head);
-char *remove_by_game_id(game_node_t *head, int del_id);
-game_t *get_game_by_id(game_node_t *head, int want_id);
+int pop_client(FILE *fp, client_node_t **head);
+int pop_game(game_node_t **head, char **del_g_name);
+int pop_track(track_node_t **head, char **del_t_f_name);
+
+/* Removing instance from the end of its LL */
+
+int remove_last_client(client_node_t **head, char **del_p_name);
+int remove_last_game(game_node_t **head, char **del_g_name);
+int remove_last_track(track_node_t **head, char **del_t_f_name);
+
+/* Removing instance by id from its LL */
+
+int remove_by_client_id(client_node_t **head, char **del_p_name, int del_id);
+int remove_by_game_id(game_node_t **head, char **del_g_name, int del_id);
+int remove_by_track_id(track_node_t **head, char **del_t_f_name, int del_id);
+
+/* Getting instance by a given ID */
+
+client_t *get_client_by_id(client_node_t **head, int want_id);
+game_t *get_game_by_id(game_node_t **head, int want_id);
+track_t *get_track_by_id(track_node_t **head, int want_id);
+
+/* Total removal of all the instances */
+
+void remove_all_clients(FILE* fp, client_node_t **head);
+void remove_all_games(FILE* fp, game_node_t **head);
+void remove_all_tracks(FILE* fp, track_node_t **head);
 
 #endif

@@ -14,4 +14,8 @@ void log_get_number_of_fields_response(FILE *fp, client_t *client);
 void log_field_info_response(FILE *fp, client_t *client, int *chosen_field_id);
 void log_list_games_response(FILE *fp, client_t *client);
 
+void log_remove_client(FILE *fp, char *name);
+void log_remove_game(FILE *fp, char *name);
+void log_remove_track(FILE *fp, char *name);
+
 #endif

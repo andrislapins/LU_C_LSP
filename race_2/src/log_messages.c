@@ -24,11 +24,11 @@ void log_time_header(FILE *fp) {
 
     fprintf(fp, "%s %li: ", ANSI_GREEN, ++log_count);
     fprintf(fp, "[%s, ", datestamp);
-    fprintf(fp, "%s]%s", timestamp, ANSI_RESET_ALL);
+    fprintf(fp, "%s]%s ", timestamp, ANSI_RESET_ALL);
 }
 
 void log_client_info(FILE *fp, client_t *client) {
-    fprintf(fp, "%s%s(%d)", ANSI_GREEN, from_who(client), client->player->ID);
+    fprintf(fp, "%s%s(ID:%d)", ANSI_GREEN, from_who(client), client->player->ID);
     fprintf(fp, "(%s)%s\n", client->ip, ANSI_RESET_ALL);
 }
 
@@ -39,7 +39,7 @@ void log_pass_generated(FILE *fp, client_t *client) {
     log_client_info(fp, client);
     fprintf(
         fp, 
-        "Generated a password - %s",
+        "Generated a password - %s\n",
         client->password
     );
 }
@@ -61,8 +61,8 @@ void log_create_game_response(FILE *fp, client_t *client) {
     log_client_info(fp, client);
     fprintf(
         fp, 
-        "Created a game=%s(ID:%d) on field(ID:%d)",
-        client->game->ID, client->game->game_h->name, client->game->track->field->ID
+        "Created a game=%s(ID:%d) on field(ID:%d)\n",
+        client->game->game_h->name, client->game->ID, client->game->track->field->ID
     );
 }
 
@@ -91,5 +91,34 @@ void log_list_games_response(FILE *fp, client_t *client) {
     fprintf(
         fp,
         "Sent the count of fields\n"
+    );
+}
+
+/* Logs when deletion of instances occurs */
+
+void log_remove_client(FILE *fp, char *name) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "Deleted client - %s\n",
+        name
+    );
+}
+
+void log_remove_game(FILE *fp, char *name) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "Deleted game - %s\n",
+        name
+    );
+}
+
+void log_remove_track(FILE *fp, char *name) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "Deleted track - %s\n",
+        name
     );
 }
