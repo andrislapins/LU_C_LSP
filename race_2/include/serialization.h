@@ -17,7 +17,7 @@ void serialize_field(char *buffer, struct Field *field);
 void deserialize_field(char *buffer, struct Field *field);
 
 void serialize_msg_CG(char *buffer, char *msg_type, char *player_name, char *game_name, int field_id);
-void deserialize_msg_CG(char *buffer, client_t *client, char *chosen_game_name, int *chosen_field_id);
+void deserialize_msg_CG(char *buffer, char* client_name, char *game_name, int *field_id);
 void serialize_msg_CG_response(char *buffer, client_t *client);
 void deserialize_msg_CG_response(char *buffer, client_t *client);
 

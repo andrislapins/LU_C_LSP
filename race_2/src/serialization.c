@@ -79,17 +79,17 @@ void deserialize_field(char *buffer, struct Field *field) {
 
 /* msg CREATE GAME serialization/deserialization */
 
-void serialize_msg_CG(char *buffer, char *msg_type, char *player_name, char *game_name, int field_id) {
+void serialize_msg_CG(char *buffer, char *msg_type, char *client_name, char *game_name, int field_id) {
     buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
-    buffer = serialize_string(buffer, player_name , CLIENT_NAME_LEN);
+    buffer = serialize_string(buffer, client_name , CLIENT_NAME_LEN);
     buffer = serialize_string(buffer, game_name , GAME_NAME_LEN);
     buffer = serialize_int(buffer, &(field_id));
 }
 
-void deserialize_msg_CG(char *buffer, client_t *client, char *chosen_game_name, int *chosen_field_id) {
-    buffer = deserialize_string(buffer, client->player->name, CLIENT_NAME_LEN);
-    buffer = deserialize_string(buffer, chosen_game_name, GAME_NAME_LEN);
-    buffer = deserialize_int(buffer, chosen_field_id);
+void deserialize_msg_CG(char *buffer, char* client_name, char *game_name, int *field_id) {
+    buffer = deserialize_string(buffer, client_name, CLIENT_NAME_LEN);
+    buffer = deserialize_string(buffer, game_name, GAME_NAME_LEN);
+    buffer = deserialize_int(buffer, field_id);
 }
 
 void serialize_msg_CG_response(char *buffer, client_t *client) {

@@ -13,8 +13,8 @@ void log_time_header(FILE *fp) {
     char timestamp[TS_BUF_LENGTH];
     char datestamp[TS_BUF_LENGTH];
 
-    memset(timestamp, 0, TS_BUF_LENGTH);
-    memset(datestamp, 0, TS_BUF_LENGTH);
+    memset(timestamp, '\0', TS_BUF_LENGTH);
+    memset(datestamp, '\0', TS_BUF_LENGTH);
 
     time_val = time(NULL);
     tm_info = localtime(&time_val);
@@ -28,8 +28,13 @@ void log_time_header(FILE *fp) {
 }
 
 void log_client_info(FILE *fp, client_t *client) {
-    fprintf(fp, "%s%s(ID:%d)", ANSI_GREEN, from_who(client), client->player->ID);
-    fprintf(fp, "(%s)%s\n", client->ip, ANSI_RESET_ALL);
+    fprintf(
+        fp, "%s%s%s(ID:%d)", 
+        ANSI_YELLOW, from_who(client), ANSI_GREEN, client->player->ID
+    );
+    fprintf(fp, "(%s)%s\n", 
+        client->ip, ANSI_RESET_ALL
+    );
 }
 
 /* General log functions */
@@ -75,13 +80,13 @@ void log_get_number_of_fields_response(FILE *fp, client_t *client) {
     );
 }
 
-void log_field_info_response(FILE *fp, client_t *client, int *chosen_field_id) {
+void log_field_info_response(FILE *fp, client_t *client, int chosen_field_id) {
     log_time_header(fp);
     log_client_info(fp, client);
     fprintf(
         fp,
         "Sent more info about field - %d\n", 
-        *chosen_field_id
+        chosen_field_id
     );
 }
 

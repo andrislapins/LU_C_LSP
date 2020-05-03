@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "common.h": "c",
-        "protocol.h": "c"
+        "protocol.h": "c",
+        "log_messages.h": "c"
     }
 }

@@ -18,19 +18,19 @@
 
 #include "protocol.h"
 
-#define IP_LEN 17
-#define PORT 9999
+#define IP_LEN      17
+#define PORT        9999
 #define MAX_CLIENTS 4
 
-#define MAX_BUFFER_SIZE 256
-#define DIGITS_LEN 5 // To (de)serilaize digits of length 4.
-#define COUNT_OF_FIELDS 1 // is this needed ?
+#define MAX_BUFFER_SIZE  256
+#define BUF_SIZE_WO_TYPE MAX_BUFFER_SIZE - 3
+#define DIGITS_LEN       5 // To (de)serilaize digits of length 4.
 
-#define MSG_TYPE_LEN 3
-#define ERR_MSG_LEN 48
+#define MSG_TYPE_LEN    3
+#define ERR_MSG_LEN     48
 #define CLIENT_NAME_LEN 30
 #define CLIENT_PASS_LEN 10
-#define GAME_NAME_LEN 20
+#define GAME_NAME_LEN   20
 
 #define FIELD_NAME_LEN 20
 
@@ -40,31 +40,32 @@
 #define ANSI_BOLD       "\e[1m"
 #define ANSI_BLINK      "\e[5m"
 
-#define ANSI_RED "\e[31m"
-#define ANSI_GREEN "\e[32m"
+#define ANSI_RED        "\e[31m"
+#define ANSI_GREEN      "\e[32m"
+#define ANSI_YELLOW     "\e[93m"
 
 // NOTE:? Could I typdef(verb) all protocol structs and safely use/manage them.
 
 // Composite data structures of the race game.
 typedef struct track {
-    struct Field *field;
-    struct Line *start_line, *main_line;
-    int n_extra_lines;
+    struct Field    *field;
+    struct Line     *start_line, *main_line;
+    int             n_extra_lines;
 } track_t;
 
 typedef struct game{
-    int ID;
+    int         ID;
     struct Game *game_h;
-    track_t *track;
+    track_t     *track;
 } game_t;
 
 typedef struct client {
-    struct Player_info *player;
-    char *password, *ip;
-    game_t *game;
+    struct Player_info  *player;
+    char                *password, *ip;
+    game_t              *game;
 
-    int sock_fd;
-    struct sockaddr_in address;
+    int                 sock_fd;
+    struct sockaddr_in  address;
 } client_t;
 
 void print_array_in_hex(char *name, void* arr, int len);

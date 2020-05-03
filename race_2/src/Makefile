@@ -12,7 +12,7 @@ HEAD=$(IDIR)/protocol.h $(IDIR)/common.h $(IDIR)/serialization.h \
 OTHER_OBJ=$(ODIR)/common.o $(ODIR)/serialization.o \
 		    $(ODIR)/linked_list.o $(ODIR)/log_messages.o
 
-all: client.exe server.exe
+all: client.exe server.exe $(OTHER_OBJ)
 
 # Additional object files.
 
