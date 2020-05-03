@@ -38,10 +38,10 @@ $(ODIR)/server.o: server.c $(HEAD)
 
 # Client/Server executables.
 
-client.exe: client.o $(OTHER_OBJ)
+client.exe: $(ODIR)/client.o $(OTHER_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
-server.exe: server.o $(OTHER_OBJ)
+server.exe: $(ODIR)/server.o $(OTHER_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:

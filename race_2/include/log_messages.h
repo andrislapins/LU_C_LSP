@@ -8,6 +8,7 @@ void log_client_info(FILE *fp, client_t *client);
 
 void log_pass_generated(FILE *fp, client_t *client);
 void log_recvd_msg_type(FILE *fp, client_t *client, char *msg_type);
+void log_lost_connection(FILE *fp, client_t *client);
 
 void log_create_game_response(FILE *fp, client_t *client);
 void log_get_number_of_fields_response(FILE *fp, client_t *client);

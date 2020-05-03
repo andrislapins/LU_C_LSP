@@ -3,7 +3,7 @@
 #include "../include/log_messages.h"
 #include "../include/linked_list.h"
 
-/* Freeing the inner allocated memory fiels */
+/* Freeing the inner allocated memory fields */
 
 void free_inner_client_fields(client_node_t **head) {
     free((*head)->client->player);
@@ -152,11 +152,26 @@ int pop_client(FILE* fp, client_node_t **head) {
         return HNULL;
     }
 
-    log_remove_client(fp, (*head)->client->player->name);
     next_node = (*head)->next_client;
 
+    // Log the action.
+    log_remove_client(fp, (*head)->client->player->name);
+
     free_inner_client_fields(head);
+
+    // Shutdown and close the connection of the client.
+    shutdown((*head)->client->sock_fd, SHUT_RDWR);
+    close((*head)->client->sock_fd);
+
+    // Free the client itself.
+    free((*head)->client);
+    (*head)->client = NULL;
+
+    // Free the node of LL.
     free(*head);
+    *head = NULL;
+
+    // Assign to the head the next node.
     *head = next_node;
 
     return RGOOD;
@@ -169,11 +184,22 @@ int pop_game(FILE *fp, game_node_t **head) {
         return HNULL;
     }
 
-    log_remove_game(fp, (*head)->game->game_h->name);
     next_node = (*head)->next_game;
 
+    // Log the action.
+    log_remove_game(fp, (*head)->game->game_h->name);
+
     free_inner_game_fields(head);
+
+    // Free the game itself.
+    free((*head)->game);
+    (*head)->game = NULL;
+
+    // Free the node of LL.
     free(*head);
+    *head = NULL;
+
+    // Assign to the head the next node.
     *head = next_node;
 
     return RGOOD;
@@ -186,11 +212,22 @@ int pop_track(FILE *fp, track_node_t **head) {
         return HNULL;
     }
 
-    log_remove_track(fp, (*head)->track->field->name);
     next_node = (*head)->next_track;
 
+    // Log the action.
+    log_remove_track(fp, (*head)->track->field->name);
+
     free_inner_track_fields(head);
+
+    // Free the track itself.
+    free((*head)->track);
+    (*head)->track = NULL;
+
+    // Free the node of LL.
     free(*head);
+    *head = NULL;
+
+    // Assign to the head the next node.
     *head = next_node;
 
     return RGOOD;
@@ -206,8 +243,20 @@ int remove_last_client(FILE *fp, client_node_t **head) {
     }
 
     if ((*head)->next_client == NULL) {
+        // Log the action.
         log_remove_client(fp, (*head)->client->player->name);
+
         free_inner_client_fields(head);
+
+        // Shutdown and close the connection of the client.
+        shutdown((*head)->client->sock_fd, SHUT_RDWR);
+        close((*head)->client->sock_fd);
+
+        // Free the client itself.
+        free((*head)->client);
+        (*head)->client = NULL;
+
+        // Free the node of LL.
         free(*head);
         *head = NULL;
 
@@ -220,8 +269,20 @@ int remove_last_client(FILE *fp, client_node_t **head) {
         current = current->next_client;
     }
 
+    // Log the action.
     log_remove_client(fp, current->next_client->client->player->name);
+
     free_inner_client_fields(&(current->next_client));
+
+    // Shutdown and close the connection of the client.
+    shutdown(current->next_client->client->sock_fd, SHUT_RDWR);
+    close(current->next_client->client->sock_fd);
+
+    // Free the client itself.
+    free(current->next_client->client);
+    current->next_client->client = NULL;
+
+    // Free the node of LL.
     free(current->next_client);
     current->next_client = NULL;
 
@@ -236,8 +297,16 @@ int remove_last_game(FILE *fp, game_node_t **head) {
     }
 
     if ((*head)->next_game == NULL) {
+        // Log the action.
         log_remove_game(fp, (*head)->game->game_h->name);
+
         free_inner_game_fields(head);
+
+        // Free the game itself.
+        free((*head)->game);
+        (*head)->game = NULL;
+
+        // Free the node of LL.
         free(*head);
         *head = NULL;
 
@@ -250,8 +319,16 @@ int remove_last_game(FILE *fp, game_node_t **head) {
         current = current->next_game;
     }
 
+    // Log the action.
     log_remove_game(fp, current->next_game->game->game_h->name);
+
     free_inner_game_fields(&(current->next_game));
+
+    // Free the game itself.
+    free(current->next_game->game);
+    current->next_game->game = NULL;
+
+    // Free the node of LL.
     free(current->next_game);
     current->next_game = NULL;
 
@@ -266,8 +343,16 @@ int remove_last_track(FILE *fp, track_node_t **head) {
     }
 
     if ((*head)->next_track == NULL) {
+        // Log the action.
         log_remove_track(fp, (*head)->track->field->name);
+
         free_inner_track_fields(head);
+
+        // Free the track itself.
+        free((*head)->track);
+        (*head)->track = NULL;
+
+        // Free the node of LL.
         free(*head);
         *head = NULL;
 
@@ -280,8 +365,16 @@ int remove_last_track(FILE *fp, track_node_t **head) {
         current = current->next_track;
     }
 
+    // Log the action.
     log_remove_track(fp, current->next_track->track->field->name);
+
     free_inner_track_fields(&(current->next_track));
+
+    // Free the track itself.
+    free(current->next_track->track);
+    current->next_track->track = NULL;
+
+    // Free the node of LL.
     free(current->next_track);
     current->next_track = NULL;
 
@@ -301,12 +394,27 @@ int remove_by_client_id(FILE *fp, client_node_t **head, int del_id) {
 
     // If the head_pointer has the ID.
     if ((*head)->client->player->ID == del_id) {
-        temp_node = *head;
+        // Log the action.
         log_remove_client(fp, (*head)->client->player->name);
+
+        // Exchange the pointers.
+        temp_node = *head;
         *head = (*head)->next_client;
 
         free_inner_client_fields(&temp_node);
+
+        // Shutdown and close the connection of the client.
+        shutdown(temp_node->client->sock_fd, SHUT_RDWR);
+        close(temp_node->client->sock_fd);
+
+        // Free the client itself.
+        free(temp_node->client);
+        temp_node->client = NULL;
+
+        // Free the node of LL.
         free(temp_node);
+        temp_node = NULL;
+
         return RGOOD;
     }
 
@@ -320,12 +428,27 @@ int remove_by_client_id(FILE *fp, client_node_t **head, int del_id) {
         }
 
         if (current->client->player->ID == del_id) {
-            temp_node = current;
+            // Log the action.
             log_remove_client(fp, current->client->player->name);
+            
+            // Exchange the pointers.
+            temp_node = current;
             before_current->next_client = current->next_client;
 
             free_inner_client_fields(&temp_node);
+
+            // Shutdown and close the connection of the client.
+            shutdown(temp_node->client->sock_fd, SHUT_RDWR);
+            close(temp_node->client->sock_fd);
+
+            // Free the client itself.
+            free(temp_node->client);
+            temp_node->client = NULL;
+
+            // Free the node of LL.
             free(temp_node);
+            temp_node = NULL;
+
             return RGOOD;
         }
 
@@ -347,12 +470,23 @@ int remove_by_game_id(FILE *fp, game_node_t **head, int del_id) {
 
     // If the head_pointer has the ID.
     if ((*head)->game->ID == del_id) {
-        temp_node = *head;
+        // Log the action.
         log_remove_game(fp, (*head)->game->game_h->name);
+        
+        // Exchange the pointers.
+        temp_node = *head;
         *head = (*head)->next_game;
 
         free_inner_game_fields(&temp_node);
+
+        // Free the game itself.
+        free(temp_node->game);
+        temp_node->game = NULL;
+
+        // Free the node of LL.
         free(temp_node);
+        temp_node = NULL;
+
         return RGOOD;
     }
 
@@ -366,12 +500,23 @@ int remove_by_game_id(FILE *fp, game_node_t **head, int del_id) {
         }
 
         if (current->game->ID == del_id) {
-            temp_node = current;
+            // Log the action.
             log_remove_game(fp, current->game->game_h->name);
+
+            // Exchange the pointers.
+            temp_node = current;
             before_current->next_game = current->next_game;
 
             free_inner_game_fields(&temp_node);
+
+            // Free the game itself.
+            free(temp_node->game);
+            temp_node->game = NULL;
+
+            // Free the node of LL.
             free(temp_node);
+            temp_node = NULL;
+
             return RGOOD;
         }
 
@@ -393,12 +538,23 @@ int remove_by_track_id(FILE *fp, track_node_t **head, int del_id) {
 
     // If the head_pointer has the ID.
     if ((*head)->track->field->ID == del_id) {
-        temp_node = *head;
+        // Log the action.
         log_remove_track(fp, (*head)->track->field->name);
+
+        // Exchange the pointers.
+        temp_node = *head;
         *head = (*head)->next_track;
 
         free_inner_track_fields(head);
+
+        // Free the track itself.
+        free(temp_node->track);
+        temp_node->track = NULL;
+
+        // Free the node of LL.
         free(temp_node);
+        temp_node = NULL;
+
         return RGOOD;
     }
 
@@ -412,12 +568,23 @@ int remove_by_track_id(FILE *fp, track_node_t **head, int del_id) {
         }
 
         if (current->track->field->ID == del_id) {
-            temp_node = current;
+            // Log the action.
             log_remove_track(fp, current->track->field->name);
+
+            // Exchange the pointers.
+            temp_node = current;
             before_current->next_track = current->next_track;
 
             free_inner_track_fields(&temp_node);
+
+            // Free the track itself.
+            free(temp_node->track);
+            temp_node->track = NULL;
+
+            // Free the node of LL.
             free(temp_node);
+            temp_node = NULL;
+            
             return RGOOD;
         }
 

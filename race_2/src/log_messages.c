@@ -59,6 +59,16 @@ void log_recvd_msg_type(FILE *fp, client_t *client, char *msg_type) {
     );
 }
 
+void log_lost_connection(FILE *fp, client_t *client) {
+    log_time_header(fp);
+    log_client_info(fp, client);
+    fprintf(
+        fp, 
+        "Lost connection with %s\n", 
+        from_who(client)
+    );
+}
+
 /* Logs for communication functions */
 
 void log_create_game_response(FILE *fp, client_t *client) {

@@ -3,8 +3,12 @@
 #include "../include/serialization.h"
 #include "../include/log_messages.h"
 
+// For IP addressing deserialisation.
 char ip[IP_LEN];
+// For not knowing the client's name.
 char na[] = "N/A";
+// For formatting client's messages.
+char msg_buf[MSG_BUF_LEN];
 
 void print_array_in_hex(char *name, void *arr, int len) {
     char *arr_p = arr;
@@ -67,3 +71,6 @@ char *from_who(client_t *client) {
 
     return na;
 }
+
+
+//

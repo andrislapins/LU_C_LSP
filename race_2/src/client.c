@@ -2,9 +2,23 @@
 #include "../include/protocol.h"
 #include "../include/serialization.h"
 #include "../include/log_messages.h"
+#include "../include/linked_list.h"
 
-// Global variables.
-static int serv_sock;
+// NOTE: Have %s p/h to which I pass fmt([string]) func which 
+// appends/prepends my format rules.
+
+// LLs and variables of the main game types.
+client_node_t *clients_start = NULL;
+unsigned int client_count    = 0; // NOTE:? Is this count needed for client.
+
+game_node_t *games_start     = NULL;
+unsigned int game_count      = 0; // NOTE:? Is this count needed for client.
+
+track_node_t *tracks_start   = NULL;
+unsigned int track_count     = 0; // NOTE:? Is this count needed for client.
+
+// The main message buffer.
+char *buffer;
 
 // Variables for global flag storing.
 static FILE *output;
@@ -13,7 +27,7 @@ static int  port;
 
 // Helper function prototypes.
 static void handle_sigint(int sig);
-static void send_n_recv(char* buffer, char *msg_type);
+static void send_n_recv(char* buffer, char *msg_type, int serv_sock);
 static void err_die_client(FILE *fp, char* err_msg);
 static void change_log_output(FILE *fp, char *path);
 static void help();
@@ -33,7 +47,7 @@ void list_games(char *buffer) {
     // memset(buffer, 0, MAX_BUFFER_SIZE);
     // serialize_msg_LI(buffer, msg_type);
 
-    // send_n_recv(buffer, msg_type);
+    // send_n_recv(buffer, msg_type, client->sock_fd);
 
     // deserialize_msg_LI_response(buffer, &(n_games));
     // printf("There is/are currently %d game on the server\n", n_games);
@@ -53,7 +67,7 @@ void list_games(char *buffer) {
     // memset(buffer, 0, MAX_BUFFER_SIZE);
     // serialize_msg_GI(buffer, msg_type);
 
-    // send_n_recv(buffer, msg_type);
+    // send_n_recv(buffer, msg_type, client->sock_fd);
 
     // deserialize_msg_GI_response(buffer);
 }
@@ -69,7 +83,7 @@ int get_number_of_fields(char* buffer, client_t *client) {
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_NF(buffer, msg_type);
 
-    send_n_recv(buffer, msg_type);
+    send_n_recv(buffer, msg_type, client->sock_fd);
 
     deserialize_msg_NF_response(buffer, &(n_field_ids));
 
@@ -90,32 +104,37 @@ int get_number_of_fields(char* buffer, client_t *client) {
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_FI(buffer, msg_type, chose);
 
-    send_n_recv(buffer, msg_type);
+    send_n_recv(buffer, msg_type, client->sock_fd);
 
     deserialize_msg_FI_response(buffer, client->game->track);
 
-    printf("Field ID: %d\n", client->game->track->field->ID);
-    printf("Field name: %s\n", client->game->track->field->name);
-    printf("Field width: %d\n", client->game->track->field->Width);
-    printf("Field height: %d\n", client->game->track->field->Height);
-    printf("Start line beggining x: %f, y: %f\n", 
+    printf("%sField ID%s: %d\n", ANSI_GREEN, ANSI_RESET_ALL, client->game->track->field->ID);
+    printf("%sField name%s: %s\n", ANSI_GREEN, ANSI_RESET_ALL, client->game->track->field->name);
+    printf("%sField width%s: %d\n", ANSI_GREEN, ANSI_RESET_ALL, client->game->track->field->Width);
+    printf("%sField height%s: %d\n", ANSI_GREEN, ANSI_RESET_ALL, client->game->track->field->Height);
+    printf("%sStart line beggining%s x: %f, y: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL, 
             client->game->track->start_line->beggining.x, 
             client->game->track->start_line->beggining.y
     );
-    printf("Start line end x: %f, y: %f\n", 
+    printf("%sStart line end%s x: %f, y: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
             client->game->track->start_line->end.x, 
             client->game->track->start_line->end.y
     );
-    printf("Main line beggining x: %f, y: %f\n", 
+    printf("%sMain line beggining%s x: %f, y: %f\n", 
+            ANSI_GREEN, ANSI_RESET_ALL,
             client->game->track->main_line->beggining.x, 
             client->game->track->main_line->beggining.y
     );
-    printf("Main line end x: %f, y: %f\n", 
+    printf("%sMain line end%s x: %f, y: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
             client->game->track->main_line->end.x, 
             client->game->track->main_line->end.y
     );
-    printf("Number of extra lines: %d\n", 
-        client->game->track->n_extra_lines
+    printf("%sNumber of extra lines%s: %d\n", 
+            ANSI_GREEN, ANSI_RESET_ALL,
+            client->game->track->n_extra_lines
     );
     // NOTE: Need to figure out how to handle extra lines. 
     // (OPT: A cycle going through the number of extra lines, and in that cycle
@@ -134,10 +153,10 @@ int get_number_of_fields(char* buffer, client_t *client) {
 
 void create_game(char *buffer, client_t *client, int field_id) {
     char    msg_type[MSG_TYPE_LEN];
-    int     p_name_allowed_size = CLIENT_NAME_LEN - 1;
-    int     g_name_allowed_size = GAME_NAME_LEN - 1;
     char    *client_name;
     char    *game_name;
+    int     p_name_allowed_size = CLIENT_NAME_LEN - 1;
+    int     g_name_allowed_size = GAME_NAME_LEN - 1;
 
     // Initialiaze the names.
     client_name = malloc(CLIENT_NAME_LEN);
@@ -171,7 +190,7 @@ void create_game(char *buffer, client_t *client, int field_id) {
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_CG(buffer, msg_type, client_name, game_name, field_id);
 
-    send_n_recv(buffer, msg_type);
+    send_n_recv(buffer, msg_type, client->sock_fd);
 
     deserialize_msg_CG_response(buffer, client);
 
@@ -183,15 +202,14 @@ void create_game(char *buffer, client_t *client, int field_id) {
     free(client_name);
     free(game_name);
 
-    // sit in while loop and get notified about new players joining (max 4) 
+    // NOTE: Sit in while loop and get notified about new players joining (max 4) 
     // until want to procees to send a START GAME request.
 }
 
 int main(int argc, char **argv) {
     struct sockaddr_in  serv_addr;
-    int                 err, flag;
+    int                 err, flag, serv_sock;
 
-    char        *buffer;
     client_t    *client;
     int         field_id;
 
@@ -238,7 +256,7 @@ int main(int argc, char **argv) {
 
     printf("Welcome to the best race game EVER!\n");
 
-    // Initialize the buffer.
+    // Allocate and initialize the buffer.
     buffer = malloc(MAX_BUFFER_SIZE);
     if (buffer == NULL) {
         err_die_client(output, "Could not allocate memory for buffer!");
@@ -246,8 +264,9 @@ int main(int argc, char **argv) {
 
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     
-    // Initialize the client and all its inner structures.
+    // Define client and all its inner structures.
     init_client(&client);
+    client->sock_fd = serv_sock;
 
     /* The lifecycle of the race game */
 
@@ -257,13 +276,22 @@ int main(int argc, char **argv) {
 
     // ...
 
-    // Exit program gracefully.
-    shutdown(serv_sock, SHUT_RDWR);
-    close(serv_sock);
+    printf("Press ENTER to exit...\n");
+    getchar();
+
+    /* Exit program gracefully */
+
+    free(buffer);
+
+    remove_all_clients(output, &clients_start);
+    remove_all_tracks(output, &tracks_start);
+    remove_all_games(output, &games_start);
 
     printf("Goodbye!\n");
     exit(EXIT_SUCCESS);
 }
+
+/* === Helper functions === */
 
 void handle_sigint(int sig) {
     char err_msg[ERR_MSG_LEN];
@@ -276,8 +304,11 @@ void handle_sigint(int sig) {
 
 
 void err_die_client(FILE *fp, char* err_msg) {
-    shutdown(serv_sock, SHUT_RDWR);
-    close(serv_sock);
+    free(buffer);
+
+    remove_all_clients(output, &clients_start);
+    remove_all_tracks(output, &tracks_start);
+    remove_all_games(output, &games_start);
 
     // General message handling.
     log_time_header(fp);
@@ -300,7 +331,7 @@ void help() {
     printf("Default values: -a=127.0.0.1, -p=%d, -l=output\n", PORT);
 }
 
-void send_n_recv(char *buffer, char *msg_type) {
+void send_n_recv(char *buffer, char *msg_type, int serv_sock) {
     ssize_t data_n;
     char    send_err_msg[ERR_MSG_LEN];
     char    recv_err_msg[ERR_MSG_LEN];
@@ -321,33 +352,49 @@ void send_n_recv(char *buffer, char *msg_type) {
 }
 
 void init_client(client_t **client) {
+    // Client struct allocation.
     *client = malloc(sizeof(client_t));
     if (*client == NULL) {
         err_die_client(output, "Could not allocate memory for client!");
     }
     // memset(*client, 0, sizeof(client_t));
 
-    // Initialize the client's player struct.
+    // Client IP address allocation.
+    (*client)->ip = malloc(IP_LEN);
+    if ((*client)->ip == NULL) {
+        err_die_client(output, "Could not allocate memory for client's IP!");
+    }
+
+    // Client password allocation.
+    (*client)->password = malloc(CLIENT_PASS_LEN);
+    if ((*client)->password == NULL) {
+        err_die_client(output, "Could not allocate memory for client's password!");
+    }
+
+
+    // Client player info struct allocation.
     (*client)->player = malloc(sizeof(struct Player_info));
     if ((*client)->player == NULL) {
         err_die_client(output, "Could not allocate memory for client's player!");
     }
+
     // memset((*client)->player, 0, sizeof(struct Player_info));
 
-    // Initialize the client's game struct.
+    // Define client's game struct.
     (*client)->game = malloc(sizeof(game_t));
     if ((*client)->game == NULL) {
         err_die_client(output, "Could not allocate memory for client's game!");
     }
     // memset((*client)->game, 0, sizeof(game_t));
 
+    // Define client's game header struct.
     (*client)->game->game_h = malloc(sizeof(struct Game));
     if ((*client)->game->game_h == NULL) {
         err_die_client(output, "Could not allocate memory for client's game header!");
     }
     // memset((*client)->game->game_h, 0, sizeof(struct Game));
 
-    // Initialize the client's game track.
+    // Define client's game track.
     (*client)->game->track = malloc(sizeof(track_t));
     if ((*client)->game->track == NULL) {
         err_die_client(output, "Could not allocate memory for client's game track!");
@@ -360,16 +407,28 @@ void init_client(client_t **client) {
     }
     // memset((*client)->game->track->field, 0, sizeof(struct Field));
 
-    // Initialize the client's game track lines.
+    // Define client's game start line.
     (*client)->game->track->start_line = malloc(sizeof(struct Line));
     if ((*client)->game->track->start_line == NULL) {
         err_die_client(output, "Could not allocate memory for client's game track start line!");
     }
     // memset((*client)->game->track->start_line, 0, sizeof(struct Line));
 
+    // Define client's game main line.
     (*client)->game->track->main_line = malloc(sizeof(struct Line));
     if ((*client)->game->track->main_line == NULL) {
         err_die_client(output, "Could not allocate memory for client's game track main line!");
     }
     // memset((*client)->game->track->main_line, 0, sizeof(struct Line));
+
+    memset((*client)->ip, '\0', IP_LEN);
+    memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
+
+    // Increase the count of players on the server.
+    client_count++;
+
+    // Save client, game, track to the globally accesable lists.
+    push_client(&clients_start, client);
+    push_game(&games_start, &((*client)->game));
+    push_track(&tracks_start, &((*client)->game->track));
 }

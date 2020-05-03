@@ -4,13 +4,17 @@
 #include "../include/log_messages.h"
 #include "../include/linked_list.h"
 
-// WARNING: Meanwhile, in case of undefined communciation from client side,
+// TODO:
+// -WARNING: Meanwhile, in case of undefined communciation from client side,
 // server dies. 
-// + Should be handled by sending an error message (type/code).
+// Should be handled by sending an error message (type/code).
 // back to client for it to handle itself.
-// NOTE:! In the protocol it is stated that MSG_TYPE will always be sent !!!
+// -NOTE:! In the protocol it is stated that MSG_TYPE will always be sent !!!
 // Will have to change the starting points and modify serialization funcs. 
-
+// -NOTE: Before message is to be deserialized, call check_err_type()
+// which would ONLY READ the first bytes (or a error msg) to detect
+// whether it should so [something].
+// -NOTE: Comment code thoroughly.
 
 // LLs and variables of the main game types.
 client_node_t *clients_start = NULL;
@@ -25,8 +29,8 @@ track_node_t *tracks_start   = NULL;
 unsigned int track_count     = 0;
 int track_id                 = 0;
 
-// Main sockets. // NOTE: (do smth according to thread practices).
-int listen_socket, client_socket;
+// The server's socket.
+int listen_socket;
 
 // Variables for global flag storing.
 FILE *output;
@@ -144,7 +148,7 @@ void handle_message(char *buffer, client_t *client) {
     } else if (strcmp(msg_type, "GI") == 0) {
         game_info_response(buffer, client);
     } else {
-        // NOTE: Have a function - set/send_err_msg().
+        // NOTE: Have a function - print AND send_err_msg() in one func.
         char err_msg[ERR_MSG_LEN];
         sprintf(err_msg, "Received an unknown type - %s", msg_type);
         err_die_server(output, err_msg);
@@ -153,10 +157,11 @@ void handle_message(char *buffer, client_t *client) {
 
 void handle_client(client_t *client) {
     char    *buffer;
-    int     leave_flag, data_n;
+    int     leave_flag, data_n, del_ret;
 
     leave_flag = 0;
 
+    // Allocate and initialize buffer (one buffer per client).
     buffer = malloc(MAX_BUFFER_SIZE);
     if (buffer == NULL) {
         err_die_server(output, "Could not allocate memory for a buffer!");
@@ -179,12 +184,10 @@ void handle_client(client_t *client) {
                 data_n = send(client->sock_fd, buffer+3, BUF_SIZE_WO_TYPE, 0);
                 if (data_n < 0) {
                     err_die_server(output, "An error occurred sending a message!");
-                    leave_flag = 1;
                 }
             }
         } else if (data_n == 0) {
-            // NOTE: Create a log message type print.
-            printf("Lost connection with %s\n", from_who(client));
+            log_lost_connection(output, client);
             leave_flag = 1;
         } else {
             err_die_server(output, "An error occurred receiving a message!");
@@ -193,10 +196,16 @@ void handle_client(client_t *client) {
         memset(buffer, '\0', MAX_BUFFER_SIZE);
     }
 
-    close(client->sock_fd);
+    // Stop handling the client gracefully.
     free(buffer);
-    free(client);
     client_count--;
+
+    del_ret = remove_by_client_id(output, &clients_start, client->player->ID);
+    if (del_ret != RGOOD) {
+        char err_msg[ERR_MSG_LEN];
+        sprintf(err_msg, "Could not delete client by ID. ERROR: %d", del_ret);
+        err_die_server(output, err_msg);
+    }
 }
 
 int main(int argc, char **argv) {
@@ -277,10 +286,7 @@ int main(int argc, char **argv) {
     /* Exit program gracefully */
 
     shutdown(listen_socket, SHUT_RDWR);
-    shutdown(client_socket, SHUT_RDWR);
-
     close(listen_socket);
-    close(client_socket);
 
     remove_all_clients(output, &clients_start);
     remove_all_tracks(output, &tracks_start);
@@ -293,10 +299,9 @@ int main(int argc, char **argv) {
 /* === Helper functions === */
 
 void handle_sigint(int sig) {
-    int err_msg_len = 48;
-    char err_msg[err_msg_len];
+    char err_msg[ERR_MSG_LEN];
 
-    memset(err_msg, 0, err_msg_len);
+    memset(err_msg, 0, ERR_MSG_LEN);
     sprintf(err_msg, "\nCaught signal - %d ", sig);
     
     err_die_server(output, err_msg);
@@ -304,10 +309,7 @@ void handle_sigint(int sig) {
 
 void err_die_server(FILE *fp, char* err_msg) {
     shutdown(listen_socket, SHUT_RDWR);
-    shutdown(client_socket, SHUT_RDWR);
-
     close(listen_socket);
-    close(client_socket);
 
     remove_all_clients(output, &clients_start);
     remove_all_tracks(output, &tracks_start);
@@ -361,8 +363,8 @@ void init_client(client_t **client) {
 
     // Zero-ing the allocated spaces.
     // memset(*client,                 0, sizeof(client_t));
-    memset((*client)->ip, '\0', IP_LEN);
     // memset((*client)->player,       0, sizeof(struct Player_info));
+    memset((*client)->ip, '\0', IP_LEN);
     memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
 
     // Allocated field definitions.

@@ -27,7 +27,9 @@
 #define DIGITS_LEN       5 // To (de)serilaize digits of length 4.
 
 #define MSG_TYPE_LEN    3
-#define ERR_MSG_LEN     48
+#define ERR_MSG_LEN     64
+#define MSG_BUF_LEN         64
+
 #define CLIENT_NAME_LEN 30
 #define CLIENT_PASS_LEN 10
 #define GAME_NAME_LEN   20
@@ -67,6 +69,8 @@ typedef struct client {
     int                 sock_fd;
     struct sockaddr_in  address;
 } client_t;
+
+// Common helper functions.
 
 void print_array_in_hex(char *name, void* arr, int len);
 void generate_password(client_t *client);
