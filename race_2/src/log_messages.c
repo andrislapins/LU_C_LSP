@@ -116,7 +116,7 @@ void log_remove_client(FILE *fp, char *name) {
     fprintf(
         fp,
         "Deleted client - %s\n",
-        name
+        name // NOTE:? Change to from_whom() or print ip
     );
 }
 
@@ -135,5 +135,113 @@ void log_remove_track(FILE *fp, char *name) {
         fp,
         "Deleted track - %s\n",
         name
+    );
+}
+
+/* Log message for client-side */
+
+void log_received_CG_msg(FILE *fp, char *msg_type, client_t *client) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "%sReceived%s:\n",
+        ANSI_YELLOW, ANSI_RESET_ALL
+    );
+    fprintf(
+        fp,
+        "%sType%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        msg_type
+    );
+    fprintf(
+        fp,
+        "%sGame ID%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->ID
+    );
+    fprintf(
+        fp,
+        "%sPlayer ID%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->player->ID
+    );
+    fprintf(
+        fp,
+        "%sPassword%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->password
+    );
+}
+
+void log_received_FI_msg(FILE *fp,char *msg_type, client_t *client) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "%sReceived%s:\n",
+        ANSI_YELLOW, ANSI_RESET_ALL
+    );
+    fprintf(
+        fp,
+        "%sType%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        msg_type
+    );
+    fprintf(
+        fp,
+        "%sField ID%s: %d\n", 
+        ANSI_GREEN, ANSI_RESET_ALL, 
+        client->game->track->field->ID
+    );
+    fprintf(
+        fp,
+        "%sField name%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL, 
+        client->game->track->field->name
+    );
+    fprintf(
+        fp, 
+        "%sField width%s: %d\n", 
+        ANSI_GREEN, ANSI_RESET_ALL, 
+        client->game->track->field->Width
+    );
+    fprintf(
+        fp, 
+        "%sField height%s: %d\n", 
+        ANSI_GREEN, ANSI_RESET_ALL, 
+        client->game->track->field->Height
+    );
+    fprintf(
+        fp, 
+        "%sStart line beggining%s x: %f, y: %f\n",
+        ANSI_GREEN, ANSI_RESET_ALL, 
+        client->game->track->start_line->beggining.x, 
+        client->game->track->start_line->beggining.y
+    );
+    fprintf(
+        fp, 
+        "%sStart line end%s x: %f, y: %f\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->track->start_line->end.x, 
+        client->game->track->start_line->end.y
+    );
+    fprintf(
+        fp, 
+        "%sMain line beggining%s x: %f, y: %f\n", 
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->track->main_line->beggining.x, 
+        client->game->track->main_line->beggining.y
+    );
+    fprintf(
+        fp, 
+        "%sMain line end%s x: %f, y: %f\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->track->main_line->end.x, 
+        client->game->track->main_line->end.y
+    );
+    fprintf(
+        fp, 
+        "%sNumber of extra lines%s: %d\n", 
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->track->n_extra_lines
     );
 }

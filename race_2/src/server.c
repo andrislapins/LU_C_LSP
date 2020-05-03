@@ -40,8 +40,7 @@ int  port;
 // Helper function prototypes.
 void handle_sigint(int sig);
 void err_die_server(FILE *fp, char* err_msg);
-void change_log_output(FILE *fp, char *path);
-void help();
+FILE *change_log_output(FILE *fp, char *path);
 
 // Global structure initialization prototypes.
 void init_client(client_t **client);
@@ -53,7 +52,7 @@ void create_game_response(char *buffer, client_t *client) {
     char    *client_name, *game_name;
     int     chosen_field_id;
 
-    // Initialiaze the names.
+    // Allocate and initialiase the names.
     client_name = malloc(CLIENT_NAME_LEN);
     if (client_name == NULL) {
         err_die_server(output, "Could not allocate memory for client name!");
@@ -67,6 +66,7 @@ void create_game_response(char *buffer, client_t *client) {
     memset(client_name, '\0', CLIENT_NAME_LEN);
     memset(game_name,   '\0', GAME_NAME_LEN);
 
+    // Handling the message from a client.
     deserialize_msg_CG(buffer, client_name, game_name, &chosen_field_id);
 
     // Create a new game.
@@ -84,7 +84,7 @@ void create_game_response(char *buffer, client_t *client) {
 
     // Set a response back to the client.
     memset(buffer, 0, BUF_SIZE_WO_TYPE);
-    serialize_msg_CG_response(buffer, client);
+    serialize_msg_CG_response(buffer, client); // + msg_type
 
     free(client_name);
     free(game_name);
@@ -133,6 +133,7 @@ void game_info_response(char *buffer, client_t *client) {
 
 void handle_message(char *buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN] = { buffer[0], buffer[1], '\0' };
+    char err_msg[ERR_MSG_LEN];
 
     buffer = buffer + 3; // Pass the point of buffer after msg_type.
     log_recvd_msg_type(output, client, msg_type);
@@ -148,8 +149,7 @@ void handle_message(char *buffer, client_t *client) {
     } else if (strcmp(msg_type, "GI") == 0) {
         game_info_response(buffer, client);
     } else {
-        // NOTE: Have a function - print AND send_err_msg() in one func.
-        char err_msg[ERR_MSG_LEN];
+        // NOTE: Have a function - print_log AND send_err_msg() in one func.
         sprintf(err_msg, "Received an unknown type - %s", msg_type);
         err_die_server(output, err_msg);
     }
@@ -157,6 +157,7 @@ void handle_message(char *buffer, client_t *client) {
 
 void handle_client(client_t *client) {
     char    *buffer;
+    char    err_msg[ERR_MSG_LEN];
     int     leave_flag, data_n, del_ret;
 
     leave_flag = 0;
@@ -181,7 +182,7 @@ void handle_client(client_t *client) {
                 // NOTE:? Should I send exact number of bytes (return size from
                 // handle_message() sequentially)
                 // EXP: Passing buffer + 3 in order to NOT send the msg_type.
-                data_n = send(client->sock_fd, buffer+3, BUF_SIZE_WO_TYPE, 0);
+                data_n = send(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
                 if (data_n < 0) {
                     err_die_server(output, "An error occurred sending a message!");
                 }
@@ -202,7 +203,6 @@ void handle_client(client_t *client) {
 
     del_ret = remove_by_client_id(output, &clients_start, client->player->ID);
     if (del_ret != RGOOD) {
-        char err_msg[ERR_MSG_LEN];
         sprintf(err_msg, "Could not delete client by ID. ERROR: %d", del_ret);
         err_die_server(output, err_msg);
     }
@@ -232,7 +232,7 @@ int main(int argc, char **argv) {
                 port = atoi(optarg);
                 break;
             case 'l':
-                change_log_output(output, optarg);
+                output = change_log_output(output, optarg);
                 break;
             case 'h':
                 help();
@@ -271,7 +271,7 @@ int main(int argc, char **argv) {
 
     fprintf(output, "%sServer is on...%s\n", ANSI_BLINK, ANSI_RESET_ALL);
 
-    // Initialize track.
+    // Initialize all tracks.
     init_tracks(&track);
 
     // Initialize client and define various client fields.
@@ -302,38 +302,36 @@ void handle_sigint(int sig) {
     char err_msg[ERR_MSG_LEN];
 
     memset(err_msg, 0, ERR_MSG_LEN);
-    sprintf(err_msg, "\nCaught signal - %d ", sig);
+    sprintf(err_msg, "Caught signal - %d", sig);
     
     err_die_server(output, err_msg);
 }
 
 void err_die_server(FILE *fp, char* err_msg) {
-    shutdown(listen_socket, SHUT_RDWR);
-    close(listen_socket);
-
-    remove_all_clients(output, &clients_start);
-    remove_all_tracks(output, &tracks_start);
-    remove_all_games(output, &games_start);
-
     // General message handling.
     log_time_header(fp);
     fprintf(fp, "%sERROR: %s ", ANSI_RED, err_msg);
     fprintf(fp, "(errno = %d): %s%s\n", errno, strerror(errno), ANSI_RESET_ALL);
 
+    // Shutdown and close the socket of the server.
+    shutdown(listen_socket, SHUT_RDWR);
+    close(listen_socket);
+
+    // Freeing memory.
+    remove_all_clients(output, &clients_start);
+    remove_all_tracks(output, &tracks_start);
+    remove_all_games(output, &games_start);
+
     exit(EXIT_FAILURE);
 }
 
-void change_log_output(FILE *fp, char *path) {
+FILE *change_log_output(FILE *fp, char *path) {
     fp = fopen(path, "w");
     if (fp == NULL) {
         err_die_server(stdout, "Error opening the given log file!");
     }
-}
 
-void help() {
-    printf("Usage format: server.exe");
-    printf("[-a ip-address] [-p port-number] [-l output-file] [-h]\n");
-    printf("Default values: -a=127.0.0.1, -p=%d, -l=stdout\n", PORT);
+    return fp;
 }
 
 void init_client(client_t **client) {
@@ -361,9 +359,7 @@ void init_client(client_t **client) {
         err_die_server(output, "Could not allocate memory for client's player!");
     }
 
-    // Zero-ing the allocated spaces.
-    // memset(*client,                 0, sizeof(client_t));
-    // memset((*client)->player,       0, sizeof(struct Player_info));
+    // Initialising the char arrays.
     memset((*client)->ip, '\0', IP_LEN);
     memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
 
@@ -398,9 +394,7 @@ void init_game(game_t **game, int chosen_field_id) {
         err_die_server(output, "Could not allocate memory for game!");
     }
 
-    // Zero-ing the allocated spaces.
-    // memset(*game,                   0, sizeof(game_t));
-    // memset((*game)->game_h,         0, sizeof(struct Game));
+    // Initialising the char arrays.
     memset((*game)->game_h->name, '\0', GAME_NAME_LEN);
 
      // Allocated field definitions.
@@ -430,15 +424,11 @@ void init_tracks(track_t **track) {
         err_die_server(output, "Could not allocate memory for a track!");
     }
 
-    // memset(*track, 0, sizeof(track_t));
-
     // Track field allocation.
     (*track)->field = malloc(sizeof(struct Field));
     if (track == NULL) {
         err_die_server(output, "Could not allocate memory for a field!");
     }
-
-    // memset((*track)->field, 0, sizeof(struct Field));
 
     // Track start line allocation.
     (*track)->start_line = malloc(sizeof(struct Line));
@@ -446,22 +436,14 @@ void init_tracks(track_t **track) {
         err_die_server(output, "Could not allocate memory for a field's start line!");
     }
 
-    // memset((*track)->start_line, 0, sizeof(struct Line));
-
     // Tracks main line allocation.
     (*track)->main_line = malloc(sizeof(struct Line));
     if ((*track)->main_line == NULL) {
         err_die_server(output, "Could not allocate memory for a field's main line!");
     }
 
-    // memset((*track)->main_line, 0, sizeof(struct Line));
-
-    // Zero-ing the allocated spaces.
-    // memset(*track, 0, sizeof(track_t));
-    // memset((*track)->field, 0, sizeof(struct Field));
+    // Initialising the char arrays.
     memset((*track)->field->name, '\0', FIELD_NAME_LEN);
-    // memset((*track)->start_line, 0, sizeof(struct Line));
-    // memset((*track)->main_line, 0, sizeof(struct Line));
 
     // Allocated field definitions.
     (*track)->n_extra_lines            = 0;

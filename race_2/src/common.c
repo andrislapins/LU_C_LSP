@@ -72,5 +72,14 @@ char *from_who(client_t *client) {
     return na;
 }
 
-
-//
+void help() {
+    printf(
+        "%sUsage format:\n",
+        ANSI_HACK
+    );
+    printf("executable [-a ip-address] [-p port-number] [-l output-file] [-h]\n");
+    printf(
+        "Default values:\n-a=127.0.0.1, -p=%d, -l=stdout%s\n",
+        PORT, ANSI_RESET_ALL
+    );
+}

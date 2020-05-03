@@ -19,4 +19,7 @@ void log_remove_client(FILE *fp, char *name);
 void log_remove_game(FILE *fp, char *name);
 void log_remove_track(FILE *fp, char *name);
 
+void log_received_CG_msg(FILE *fp,char *msg_type, client_t *client);
+void log_received_FI_msg(FILE *fp,char *msg_type, client_t *client);
+
 #endif

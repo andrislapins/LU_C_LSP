@@ -45,6 +45,7 @@
 #define ANSI_RED        "\e[31m"
 #define ANSI_GREEN      "\e[32m"
 #define ANSI_YELLOW     "\e[93m"
+#define ANSI_HACK        "\e[40;38;5;82m"
 
 // NOTE:? Could I typdef(verb) all protocol structs and safely use/manage them.
 
@@ -77,5 +78,6 @@ void generate_password(client_t *client);
 char *ip_addr(struct sockaddr_in addr);
 void get_group_n_id(int *base, int *group, int *index);
 char *from_who(client_t *client);
+void help();
 
 #endif
