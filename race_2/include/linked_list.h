@@ -65,4 +65,8 @@ void remove_all_clients(FILE* fp, client_node_t **head);
 void remove_all_games(FILE* fp, game_node_t **head);
 void remove_all_tracks(FILE* fp, track_node_t **head);
 
+/* Get all IDs of a type */
+
+int get_game_ids(FILE *fp, game_node_t **head, int **gid_arr, int game_count);
+
 #endif

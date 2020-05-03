@@ -105,7 +105,7 @@ void log_list_games_response(FILE *fp, client_t *client) {
     log_client_info(fp, client);
     fprintf(
         fp,
-        "Sent the count of fields\n"
+        "Sent the count of games and game IDs\n"
     );
 }
 
@@ -138,7 +138,7 @@ void log_remove_track(FILE *fp, char *name) {
     );
 }
 
-/* Log message for client-side */
+/* Log messages for client-side */
 
 void log_received_CG_msg(FILE *fp, char *msg_type, client_t *client) {
     log_time_header(fp);
@@ -173,7 +173,7 @@ void log_received_CG_msg(FILE *fp, char *msg_type, client_t *client) {
     );
 }
 
-void log_received_FI_msg(FILE *fp,char *msg_type, client_t *client) {
+void log_received_FI_msg(FILE *fp, char *msg_type, client_t *client) {
     log_time_header(fp);
     fprintf(
         fp,
@@ -244,4 +244,48 @@ void log_received_FI_msg(FILE *fp,char *msg_type, client_t *client) {
         ANSI_GREEN, ANSI_RESET_ALL,
         client->game->track->n_extra_lines
     );
+}
+
+void log_received_LI_msg(FILE *fp, char *msg_type, int n_games, int *gid_arr) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "%sReceived%s:\n",
+        ANSI_YELLOW, ANSI_RESET_ALL
+    );
+    fprintf(
+        fp,
+        "%sType%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        msg_type
+    );
+
+    // Check the value of count of games.
+    if (n_games == 1) {
+        fprintf(
+            fp,
+            "%sThere is currently %s%d%s game on the server%s\n",
+            ANSI_GREEN, ANSI_YELLOW,
+            n_games,
+            ANSI_GREEN, ANSI_RESET_ALL
+        );
+    } else {
+        fprintf(
+            fp,
+            "%sThere are currently %s%d%s games on the server%s\n",
+            ANSI_GREEN, ANSI_YELLOW,
+            n_games,
+            ANSI_GREEN, ANSI_RESET_ALL
+        );
+    }
+
+    // Print those game IDs.
+    for(int i = 0; i < n_games; i++) {
+        fprintf(
+            fp,
+            "%sGID%s: %d\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            gid_arr[i]
+        );
+    }
 }

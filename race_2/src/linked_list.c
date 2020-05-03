@@ -47,8 +47,6 @@ int push_client(client_node_t **head, client_t **value) {
             return MFAIL;
         }
 
-        // memset(*head, 0, sizeof(client_node_t));
-
         (*head)->client = *value;
         (*head)->next_client = NULL;
 
@@ -66,8 +64,6 @@ int push_client(client_node_t **head, client_t **value) {
         return MFAIL;
     }
 
-    // memset(current->next_client, 0, sizeof(client_node_t));
-
     current->client = *value;
     current->next_client->next_client = NULL;
 
@@ -82,8 +78,6 @@ int push_game(game_node_t **head, game_t **value) {
         if (*head == NULL) {
             return MFAIL;
         }
-
-        // memset(*head, 0, sizeof(game_node_t));
 
         (*head)->game = *value;
         (*head)->next_game = NULL;
@@ -101,7 +95,6 @@ int push_game(game_node_t **head, game_t **value) {
     if (current->next_game == NULL) {
         return MFAIL;
     }
-    // memset(current->next_game, 0, sizeof(game_node_t));
 
     current->game = *value;
     current->next_game->next_game = NULL;
@@ -117,7 +110,6 @@ int push_track(track_node_t **head, track_t **value) {
         if (*head == NULL) {
             return MFAIL;
         }
-        // memset(*head, 0, sizeof(track_node_t));
 
         (*head)->track = *value;
         (*head)->next_track = NULL;
@@ -135,7 +127,6 @@ int push_track(track_node_t **head, track_t **value) {
     if (current->next_track == NULL) {
         return MFAIL;
     }
-    // memset(current->next_track, 0, sizeof(track_node_t));
  
     current->track = *value;
     current->next_track->next_track = NULL;
@@ -664,4 +655,24 @@ void remove_all_tracks(FILE* fp, track_node_t **head) {
     do {
         ret = pop_track(fp, head);
     } while(ret != HNULL);
+}
+
+/* Get all IDs of a type */
+
+int get_game_ids(FILE *fp, game_node_t **head, int **gid_arr, int game_count) {
+    game_node_t *current;
+
+    current = *head;
+
+    *gid_arr = calloc(game_count, sizeof(int));
+    if (gid_arr == NULL) {
+        return MFAIL;
+    }
+
+    for(int i = 0; current != NULL; i++) {
+        *gid_arr[i] = current->game->ID;
+        current = current->next_game;
+    }
+
+    return RGOOD;
 }

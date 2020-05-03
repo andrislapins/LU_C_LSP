@@ -160,13 +160,22 @@ void serialize_msg_LI(char *buffer, char *msg_type) {
 
 void deserialize_msg_LI();
 
-void serialize_msg_LI_response(char *buffer, int count_of_games) {
+void serialize_msg_LI_response(char *buffer, int count_of_games, int **gid_arr) {
     buffer = serialize_int(buffer, &(count_of_games));
+    // Serialize each game ID.
+    for(int i = 0; i < count_of_games; i++) {
+        buffer = serialize_int(buffer, gid_arr[i]);
+    }
 }
 
-void deserialize_msg_LI_response(char *buffer, char *msg_type, int *n_game_ids) {
+void deserialize_msg_LI_response(char *buffer, char *msg_type, int *n_game_ids, int **gid_arr) {
     buffer = deserialize_string(buffer, msg_type , MSG_TYPE_LEN);
     buffer = deserialize_int(buffer, n_game_ids);
+    // Deserialize each received game ID.
+    *gid_arr = malloc(*n_game_ids * sizeof(int));
+    for(int i = 0; i < *n_game_ids; i++) {
+        buffer = deserialize_int(buffer, gid_arr[i]);
+    }
 }
 
 /* msg GAME INFO serialization/deserialization */

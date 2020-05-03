@@ -9,13 +9,8 @@
 
 // LLs and variables of the main game types.
 client_node_t *clients_start = NULL;
-unsigned int client_count    = 0; // NOTE:? Is this count needed for client.
-
 game_node_t *games_start     = NULL;
-unsigned int game_count      = 0; // NOTE:? Is this count needed for client.
-
 track_node_t *tracks_start   = NULL;
-unsigned int track_count     = 0; // NOTE:? Is this count needed for client.
 
 // The main message buffer.
 char *buffer;
@@ -34,22 +29,29 @@ void change_log_output(FILE *fp, char *path);
 // Global structure initialization prototypes.
 void init_client(client_t **client);
 
-void list_games(char *buffer) {
-    // char msg_type[MSG_TYPE_LEN];
-    // char num_str[DIGITS_LEN];
-    // int *game_ids; // store array of received ids.
-    // int n_games, chose;
+/* The main functions for communication */
 
-    // memset(num_str, 0, DIGITS_LEN);
-    // strcpy(msg_type, "LI\0");
+void list_games(char *buffer, client_t *client) {
+    char msg_type[MSG_TYPE_LEN];
+    char num_str[DIGITS_LEN];
+    // Store array of received game IDs.
+    int *gid_arr;
+    int n_games;//, chose;
 
-    // memset(buffer, 0, MAX_BUFFER_SIZE);
-    // serialize_msg_LI(buffer, msg_type);
+    memset(num_str, '\0', DIGITS_LEN);
+    strcpy(msg_type, "LI\0");
 
-    // send_n_recv(buffer, msg_type, client->sock_fd);
+    memset(buffer, '\0', MAX_BUFFER_SIZE);
+    serialize_msg_LI(buffer, msg_type);
 
-    // deserialize_msg_LI_response(buffer, &(n_games));
-    // printf("There is/are currently %d game on the server\n", n_games);
+    send_n_recv(buffer, msg_type, client->sock_fd);
+
+    deserialize_msg_LI_response(buffer, msg_type, &(n_games), &gid_arr);
+
+    // Log the response.
+    log_received_LI_msg(output, msg_type, n_games, gid_arr);
+
+    free(gid_arr);
     // printf("Choose a ... to get more info: ");
     // fgets(num_str, DIGITS_LEN, stdin);
 
@@ -259,7 +261,7 @@ int main(int argc, char **argv) {
 
     field_id = get_number_of_fields(buffer, client);
     create_game(buffer, client, field_id);
-    list_games(buffer);
+    list_games(buffer, client);
 
     /* Exit program gracefully */
 
@@ -390,13 +392,10 @@ void init_client(client_t **client) {
         err_die_client(output, "Could not allocate memory for client's game track main line!");
     }
 
+    // Initialising the char arrays.
     memset((*client)->ip, '\0', IP_LEN);
     memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
-
-    // Increase the count of clients, games, tracks on the client.
-    client_count++;
-    game_count++;
-    track_count++;
+    memset((*client)->game->game_h->name, '\0', GAME_NAME_LEN);
 
     // Save client, game, track to the globally accesable lists.
     push_client(&clients_start, client);

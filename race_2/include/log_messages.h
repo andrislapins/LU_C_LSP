@@ -21,5 +21,6 @@ void log_remove_track(FILE *fp, char *name);
 
 void log_received_CG_msg(FILE *fp,char *msg_type, client_t *client);
 void log_received_FI_msg(FILE *fp,char *msg_type, client_t *client);
+void log_received_LI_msg(FILE *fp, char *msg_type, int n_games, int *gid_arr);
 
 #endif

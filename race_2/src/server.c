@@ -9,11 +9,9 @@
 // server dies. 
 // Should be handled by sending an error message (type/code).
 // back to client for it to handle itself.
-// -NOTE:! In the protocol it is stated that MSG_TYPE will always be sent !!!
-// Will have to change the starting points and modify serialization funcs. 
-// -NOTE: Before message is to be deserialized, call check_err_type()
+// -NOTE: On the client, before message is to be deserialized, call check_err_type()
 // which would ONLY READ the first bytes (or a error msg) to detect
-// whether it should so [something].
+// whether it should do [something].
 // -NOTE: Comment code thoroughly.
 
 // LLs and variables of the main game types.
@@ -84,7 +82,7 @@ void create_game_response(char *buffer, client_t *client) {
 
     // Set a response back to the client.
     memset(buffer, 0, BUF_SIZE_WO_TYPE);
-    serialize_msg_CG_response(buffer, client); // + msg_type
+    serialize_msg_CG_response(buffer, client);
 
     free(client_name);
     free(game_name);
@@ -120,9 +118,21 @@ void field_info_response(char *buffer, client_t *client) {
 }
 
 void list_games_response(char *buffer, client_t *client) {
+    int     *gid_arr, ret;
+    char    err_msg[ERR_MSG_LEN];
+
+    // Get all the game IDs.
+    ret = get_game_ids(output, &games_start, &gid_arr, game_count);
+    if (ret != RGOOD) {
+        sprintf(err_msg, "Could not get game IDs. ERROR: %d", ret);
+        err_die_server(output, err_msg);
+    }
+
     // Set a response back to the client.
     memset(buffer, '\0', BUF_SIZE_WO_TYPE);
-    serialize_msg_LI_response(buffer, game_count);
+    serialize_msg_LI_response(buffer, game_count, &gid_arr);
+
+    free(gid_arr);
 
     log_list_games_response(output, client);
 }
@@ -178,10 +188,9 @@ void handle_client(client_t *client) {
         data_n = recv(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
         if (data_n > 0) {
             if (strlen(buffer) > 0) {
+                // Check the msg type and handle accordingly.
                 handle_message(buffer, client);
-                // NOTE:? Should I send exact number of bytes (return size from
-                // handle_message() sequentially)
-                // EXP: Passing buffer + 3 in order to NOT send the msg_type.
+                // Send the request back to client.
                 data_n = send(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
                 if (data_n < 0) {
                     err_die_server(output, "An error occurred sending a message!");
@@ -194,13 +203,16 @@ void handle_client(client_t *client) {
             err_die_server(output, "An error occurred receiving a message!");
         }
 
+        // Reinitialise the message buffer.
         memset(buffer, '\0', MAX_BUFFER_SIZE);
     }
 
-    // Stop handling the client gracefully.
+    /* Stop handling the client gracefully */
+
     free(buffer);
     client_count--;
 
+    // Remove the client from the global LL and check for errors.
     del_ret = remove_by_client_id(output, &clients_start, client->player->ID);
     if (del_ret != RGOOD) {
         sprintf(err_msg, "Could not delete client by ID. ERROR: %d", del_ret);
