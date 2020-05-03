@@ -3,6 +3,6 @@
 *.out
 *.bin
 *.dat
-
+*.exe
 # Zip files.
 *.zip
