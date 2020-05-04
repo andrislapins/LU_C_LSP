@@ -32,6 +32,6 @@ void log_received_GI_msg(
     int g_client_count, struct Player_info ***p
 );
 void log_received_JG_msg(FILE *fp,char *msg_type, client_t *client);
-
+void log_msg_NOTIFY(FILE *fp, char *msg_type, char *name, int new_p_id);
 
 #endif

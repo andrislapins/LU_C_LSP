@@ -46,6 +46,8 @@ void generate_password(FILE *fp, client_t *client) {
 
     client->password[CLIENT_PASS_LEN-1] = '\0';
 
+    print_array_in_hex("in func", client->password, CLIENT_PASS_LEN);
+
     log_pass_generated(fp, client);
 }
 

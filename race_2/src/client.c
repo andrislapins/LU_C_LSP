@@ -39,7 +39,7 @@ void init_tracks();
 /* The main functions for communication */
 
 void join_game(char *buffer, client_t *client, int game_id) {
-    char msg_type[MSG_TYPE_LEN];
+    char    msg_type[MSG_TYPE_LEN];
     char    *name_buf;
     int     p_name_allowed_size = CLIENT_NAME_LEN - 1;
 
@@ -71,12 +71,13 @@ void join_game(char *buffer, client_t *client, int game_id) {
 
     /* Serialize the data */
 
+    memset(msg_type, '\0', MSG_TYPE_LEN); // NOTE: Does this fix password error.
+
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_JG(buffer, msg_type, game_id, client->player->name);
 
     send_n_recv(buffer, msg_type, client->sock_fd);
 
-    memset(client->password, '\0', CLIENT_PASS_LEN); ///
     deserialize_msg_JG_response(buffer, msg_type, client);
 
     // Log the response.
@@ -121,7 +122,7 @@ int list_games(char *buffer, client_t *client) {
     
     /* GAME INFO */
 
-    strncpy(msg_type, "GI\0", 3);
+    strcpy(msg_type, "GI\0");
 
     // Reinitialize the buffer for numbers.
     memset(num_str, '\0', DIGITS_LEN);
@@ -147,7 +148,7 @@ int list_games(char *buffer, client_t *client) {
         err_die_client(output, "There is no such game ID!");
     }
 
-    client->game->ID = chose;
+    client->game->ID = chose; // bug unitialised !!!
 
     // Reinitialize the buffer for data serialization.
     memset(buffer, '\0', MAX_BUFFER_SIZE);
@@ -181,8 +182,8 @@ int get_number_of_fields(char* buffer, client_t *client) {
     char num_str[DIGITS_LEN];
     int  n_field_ids, chose;
     // For allocating game and track memory for client.
-    game_t *game;
-    track_t *track;
+    // game_t *game;
+    // track_t *track;
 
     /* GET_NUMBER_OF_FIELDS */
 
@@ -200,16 +201,6 @@ int get_number_of_fields(char* buffer, client_t *client) {
     /* FIELD INFO */
 
     strncpy(msg_type, "FI\0", 3);
-
-    // Create a new game instance on the client FIRST as the parent of track.
-    init_game(&game);
-
-    // Assign the game to the client.
-    client->game = game;
-
-    // Allocate, initialize and assign the track to client.
-    init_tracks(&track);
-    client->game->track = track;
 
     // Getting the chosen field ID.
     printf("Choose a field in range from 1 to %d to get more info: ", n_field_ids);
@@ -310,10 +301,30 @@ void create_game(char *buffer, client_t *client, int field_id) {
     // Log the response.
     log_received_CG_msg(output, msg_type, client);
 
-    free(name_buf);
+    /* Get notified about new players */
 
-    // NOTE: Sit in while loop and get notified about new players joining (max 4) 
-    // until want to procees to send a START GAME request.
+    // NOTE: Sit in a while loop and get notified about new players joining (max 4) 
+    // until want to proceess to send a START GAME request.
+    ssize_t data_n, new_p_id;
+    char    recv_err_msg[ERR_MSG_LEN];
+
+    while (1) {
+        memset(buffer, '\0', MAX_BUFFER_SIZE);
+        memset(msg_type, '\0', MSG_TYPE_LEN);
+        memset(name_buf, '\0', MSG_BUF_LEN);
+
+        data_n = recv(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
+        if (data_n < 0) {
+            sprintf(recv_err_msg, "Could not receive message of type %s!", msg_type);
+            err_die_client(output, recv_err_msg);
+        }
+
+        deserialize_msg_NOTIFY(buffer, msg_type, name_buf, &new_p_id);
+
+        log_msg_NOTIFY(output, msg_type, name_buf, new_p_id);
+    }
+
+    free(name_buf);
 }
 
 int main(int argc, char **argv) {
@@ -379,15 +390,40 @@ int main(int argc, char **argv) {
     init_client(&client);
     client->sock_fd = serv_sock;
 
-    /* The lifecycle of the race game */
+    /* === The lifecycle of the race game === */
 
-    // USER-OPT-CREATE branch.
-    field_id = get_number_of_fields(buffer, client);
-    create_game(buffer, client, field_id);
+    // Prepare a buffer where to store the clients answer.
+    char *answer_buf;
+    answer_buf = malloc(MSG_BUF_LEN);
+    if (answer_buf == NULL) {
+        err_die_client(output, "Could not allocate memory for name buffer!");
+    }
 
-    // USER-OPT-JOIN branch.
-    game_id = list_games(buffer, client);
-    join_game(buffer, client, game_id);
+    memset(answer_buf, '\0', MSG_BUF_LEN);
+
+    // Ask for whether client wants to JOIN or CREATE a game.
+    fprintf(output, "Do you want to CREATE or JOIN a game?: ");
+    fgets(answer_buf, MSG_BUF_LEN, stdin);
+
+    // Set the last element of name_buf to 0 for checking the length. 
+    answer_buf[MSG_BUF_LEN-1] = '\0';
+    if (strlen(answer_buf) > sizeof("CREATE")+1) {
+        err_die_client(output, "The answer is invalid!");
+    }
+
+    answer_buf[strlen(answer_buf)-1] = '\0';
+
+    if (strcmp(answer_buf, "CREATE") == 0) {        // CREATE branch.
+        field_id = get_number_of_fields(buffer, client);
+        create_game(buffer, client, field_id);
+        // create_game(buffer, client, field_id); // BUG: When creating two
+        // games and then some other client sends LG msg - server crashes.
+    } else if (strcmp(answer_buf, "JOIN") == 0) {   // JOIN branch.
+        game_id = list_games(buffer, client);
+        join_game(buffer, client, game_id);
+    } else {
+        err_die_client(output, "The answer is invalid!");
+    }
 
     /* Exit program gracefully */
 
@@ -395,6 +431,7 @@ int main(int argc, char **argv) {
     getchar();
 
     free(buffer);
+    free(answer_buf);
 
     remove_all_clients(output, &clients_start);
     remove_all_tracks(output, &tracks_start);
@@ -459,6 +496,9 @@ void send_n_recv(char *buffer, char *msg_type, int serv_sock) {
 }
 
 void init_client(client_t **client) {
+    game_t  *game;
+    track_t *track;
+
     // Client struct allocation.
     *client = malloc(sizeof(client_t));
     if (*client == NULL) {
@@ -498,6 +538,14 @@ void init_client(client_t **client) {
 
     // Save this client in the global clients list.
     push_client(&clients_start, client);
+
+    // Allocate, initialize and assign the game to client.
+    init_game(&game);
+    (*client)->game = game;
+
+    // Allocate, initialize and assign the track to client.
+    init_tracks(&track);
+    (*client)->game->track = track;
 }
 
 void init_game(game_t **game) {

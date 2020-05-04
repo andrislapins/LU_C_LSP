@@ -5,6 +5,7 @@ ODIR=obj
 
 CC=gcc
 CFLAGS=-g -Wall -Werror -I$(IDIR)
+LFLAGS=-lpthread
 
 HEAD=$(IDIR)/protocol.h $(IDIR)/common.h $(IDIR)/serialization.h \
 			$(IDIR)/linked_list.h $(IDIR)/log_messages.h
@@ -42,7 +43,7 @@ client.exe: $(ODIR)/client.o $(OTHER_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
 server.exe: $(ODIR)/server.o $(OTHER_OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LFLAGS)
 
 clean:
 	rm -f *.exe $(ODIR)/*.o

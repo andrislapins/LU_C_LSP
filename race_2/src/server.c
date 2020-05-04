@@ -14,6 +14,9 @@
 // whether it should do [something].
 // -NOTE: Comment code thoroughly.
 
+// Mutex initializer.
+pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 // LLs and variables of the main game types.
 client_node_t *clients_start = NULL;
 unsigned int client_count    = 0;
@@ -46,6 +49,7 @@ void init_game(game_t **game, int chosen_field_id);
 void init_tracks();
 
 void create_game_response(char *buffer, client_t *client) {
+    pthread_mutex_lock(&clients_mutex);
     game_t  *game;
     char    *client_name, *game_name;
     int     chosen_field_id;
@@ -74,7 +78,12 @@ void create_game_response(char *buffer, client_t *client) {
     strcpy(game->game_h->name, game_name);
     strcpy(client->player->name, client_name);
 
-    // Assign the new game for the client.
+    // CHECK and FREE the dummy game and only then assign the new game 
+    // for the client. NOTE: Should I allow a client create two games?
+    if (client->game->ID == 0) {
+        free(client->game);
+    }
+    
     client->game = game;
 
     // Create a password for the client.
@@ -88,17 +97,22 @@ void create_game_response(char *buffer, client_t *client) {
     free(game_name);
 
     log_create_game_response(output, client);
+
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void get_number_of_fields_response(char *buffer, client_t *client) {
+    pthread_mutex_lock(&clients_mutex);
     // Set a response back to the client.
     memset(buffer, '\0', BUF_SIZE_WO_TYPE);
     serialize_msg_NF_response(buffer, track_count);
 
     log_get_number_of_fields_response(output, client);
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void field_info_response(char *buffer, client_t *client) {
+    pthread_mutex_lock(&clients_mutex);
     track_t *chosen_track;
     int chose;
 
@@ -115,9 +129,11 @@ void field_info_response(char *buffer, client_t *client) {
     serialize_msg_FI_response(buffer, chosen_track);
 
     log_field_info_response(output, client, chose);
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void list_games_response(char *buffer, client_t *client) {
+    pthread_mutex_lock(&clients_mutex);
     int     *gid_arr, ret;
     char    err_msg[ERR_MSG_LEN];
 
@@ -135,12 +151,14 @@ void list_games_response(char *buffer, client_t *client) {
     free(gid_arr);
 
     log_list_games_response(output, client);
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void game_info_response(char *buffer, client_t *client) {
+    pthread_mutex_lock(&clients_mutex);
     client_t *g_clients[MAX_CLIENTS_PER_GAME];
-    game_t *chosen_game;
     client_node_t *current;
+    game_t *chosen_game;
     int chosen_gid, g_client_count;
 
     // Handling the message from a client.
@@ -166,14 +184,24 @@ void game_info_response(char *buffer, client_t *client) {
         current = current->next_client;
     }
 
+    // CHECK and FREE the dummy game and only then assign the new game 
+    // for the client. NOTE: Should I allow a client create two games?
+    if (client->game->ID == 0) {
+        free(client->game);
+    }
+    
+    client->game = chosen_game;
+
     // Set a response back to the client.
     memset(buffer, '\0', BUF_SIZE_WO_TYPE);
     serialize_msg_GI_response(buffer, chosen_game, g_client_count, g_clients);
 
     log_game_info_response(output, client, chosen_gid);
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void join_game_response(char *buffer, client_t *client) {
+    pthread_mutex_lock(&clients_mutex);
     game_t *chosen_game;
     int chosen_game_id;
     char *client_name;
@@ -213,6 +241,7 @@ void join_game_response(char *buffer, client_t *client) {
 
     // Log the response.
     log_join_game_response(output, client);
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void handle_message(char *buffer, client_t *client) {
@@ -287,7 +316,6 @@ void *handle_client(void *arg) {
     /* Stop handling the client gracefully */
 
     free(buffer);
-    client_count--;
 
     // Remove the client from the global LL and check for errors.
     del_ret = remove_by_client_id(output, &clients_start, client->player->ID);
@@ -295,6 +323,13 @@ void *handle_client(void *arg) {
         sprintf(err_msg, "Could not delete client by ID. ERROR: %d", del_ret);
         err_die_server(output, err_msg);
     }
+
+    client_count--;
+    
+    // End thread instantlly.
+    pthread_detach(pthread_self());
+
+    return NULL;
 }
 
 int main(int argc, char **argv) {
@@ -365,9 +400,6 @@ int main(int argc, char **argv) {
     init_tracks(&track);
 
     // Initialize client and define various client fields.
-    // NOTE: Might need to save in a different var the sock and then assign
-    // inside an if statement.
-
     while (1) {
         client_addr_len = sizeof(client_addr);
         received_conn = accept(
@@ -389,13 +421,6 @@ int main(int argc, char **argv) {
 
         sleep(1);
     }
-    // init_client(&client);
-    // client->sock_fd = accept(listen_socket, (struct sockaddr*)&client_addr, &client_addr_len);
-    // client->address = client_addr;
-    // strcpy(client->ip, ip_addr(client_addr));
-
-    // // NOTE: Manage in a thread.
-    // handle_client(client);
 
     /* Exit program gracefully */
 
@@ -449,6 +474,7 @@ FILE *change_log_output(FILE *fp, char *path) {
 }
 
 void init_client(client_t **client, int client_sock) {
+    pthread_mutex_lock(&clients_mutex);
     // Client struct allocation.
     *client = malloc(sizeof(client_t));
     if (*client == NULL) {
@@ -473,6 +499,15 @@ void init_client(client_t **client, int client_sock) {
         err_die_server(output, "Could not allocate memory for client's player!");
     }
 
+    // "Dummy " game type allocation for client.
+    // ATTENTION: Needs to be freed before assigning a different game pointer.
+    (*client)->game = malloc(sizeof(game_t));
+    if ((*client)->game == NULL) {
+        err_die_server(output, "Could not allocate memory for game!");
+    }
+
+    (*client)->game->ID = 0;
+
     // Initialising the char arrays.
     memset((*client)->ip, '\0', IP_LEN);
     memset((*client)->password, '\0', CLIENT_PASS_LEN);
@@ -494,9 +529,12 @@ void init_client(client_t **client, int client_sock) {
 
     // Save this client in the global clients list.
     push_client(&clients_start, client);
+
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void init_game(game_t **game, int chosen_field_id) {
+    // pthread_mutex_lock(&clients_mutex);
     track_t *chosen_track;
 
     // Game struct allocation.
@@ -532,6 +570,8 @@ void init_game(game_t **game, int chosen_field_id) {
 
     // Save this game in the global games list.
     push_game(&games_start, game);
+
+    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void init_tracks(track_t **track) {

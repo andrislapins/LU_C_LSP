@@ -29,8 +29,12 @@ void log_time_header(FILE *fp) {
 
 void log_client_info(FILE *fp, client_t *client) {
     fprintf(
-        fp, "%s%s%s(ID:%d)", 
-        ANSI_YELLOW, from_who(client), ANSI_GREEN, client->player->ID
+        fp, "%s%s%s", 
+        ANSI_YELLOW, from_who(client), ANSI_GREEN
+    );
+    fprintf(
+        fp, "(ID:%d)", 
+        client->player->ID
     );
     fprintf(fp, "(%s)%s\n", 
         client->ip, ANSI_RESET_ALL
@@ -452,5 +456,34 @@ void log_received_JG_msg(FILE *fp, char *msg_type, client_t *client) {
         "%sPassword%s: %s\n",
         ANSI_GREEN, ANSI_RESET_ALL,
         client->password
+    );
+
+    print_array_in_hex("IN LOG", client->password, CLIENT_PASS_LEN);
+}
+
+void log_msg_NOTIFY(FILE *fp, char *msg_type, char *name, int new_p_id) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "%sReceived%s:\n",
+        ANSI_YELLOW, ANSI_RESET_ALL
+    );
+    fprintf(
+        fp,
+        "%sType%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        msg_type
+    );
+    fprintf(
+        fp,
+        "%sPlayer ID%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        new_p_id
+    );
+    fprintf(
+        fp,
+        "%sPlayer name%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        name
     );
 }

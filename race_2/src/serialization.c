@@ -254,6 +254,8 @@ void deserialize_msg_GI_response(
     *other_pi_arr_of_p = pi_arr_of_p;
 }
 
+/* msg JOIN GAME serialization/deserialization */
+
 void serialize_msg_JG(char *buffer, char *msg_type, int game_id, char *client_name) {
     buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
     buffer = serialize_int(buffer, &(game_id));
@@ -274,4 +276,12 @@ void deserialize_msg_JG_response(char *buffer, char *msg_type, client_t *client)
     buffer = deserialize_string(buffer, msg_type, MSG_TYPE_LEN);
     buffer = deserialize_int(buffer, &(client->player->ID));
     buffer = deserialize_string(buffer, client->password, CLIENT_PASS_LEN);
+}
+
+/* msg NOTIFY PLAYER JOINED serialization/deserialization */
+
+void deserialize_msg_NOTIFY(char *buffer, char *msg_type, char *name_buf, int *new_p_id) {
+    buffer = deserialize_string(buffer, msg_type, MSG_TYPE_LEN);
+    buffer = deserialize_int(buffer, new_p_id);
+    buffer = deserialize_string(buffer, name_buf, CLIENT_NAME_LEN);
 }
