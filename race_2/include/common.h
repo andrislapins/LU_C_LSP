@@ -29,7 +29,7 @@
 
 #define MSG_TYPE_LEN    3
 #define ERR_MSG_LEN     64
-#define MSG_BUF_LEN         64
+#define MSG_BUF_LEN     64
 
 #define CLIENT_NAME_LEN 30
 #define CLIENT_PASS_LEN 10

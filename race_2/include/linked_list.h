@@ -65,6 +65,13 @@ void remove_all_clients(FILE* fp, client_node_t **head);
 void remove_all_games(FILE* fp, game_node_t **head);
 void remove_all_tracks(FILE* fp, track_node_t **head);
 
+/* Other helper functions */
+
+int spot_and_delete_client_duplicate(
+    FILE *fp, client_node_t **head,
+    int *client_count, int *g_client_count, int client_id
+);
+
 /* Get all IDs of a type */
 
 int get_game_ids(FILE *fp, game_node_t **head, int **gid_arr, int game_count);

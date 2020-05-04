@@ -64,7 +64,7 @@ int push_client(client_node_t **head, client_t **value) {
         return MFAIL;
     }
 
-    current->client = *value;
+    current->next_client->client = *value;
     current->next_client->next_client = NULL;
 
     return RGOOD;
@@ -96,7 +96,7 @@ int push_game(game_node_t **head, game_t **value) {
         return MFAIL;
     }
 
-    current->game = *value;
+    current->next_game->game = *value;
     current->next_game->next_game = NULL;
 
     return RGOOD;
@@ -128,7 +128,7 @@ int push_track(track_node_t **head, track_t **value) {
         return MFAIL;
     }
  
-    current->track = *value;
+    current->next_track->track = *value;
     current->next_track->next_track = NULL;
 
     return RGOOD;
@@ -269,8 +269,11 @@ int remove_last_client(FILE *fp, client_node_t **head) {
     free_inner_client_fields(&(current->next_client));
 
     // Shutdown and close the connection of the client.
-    shutdown(current->next_client->client->sock_fd, SHUT_RDWR);
-    close(current->next_client->client->sock_fd);
+    // -1 is when client tries to close other client sockets.
+    if ((*head)->client->sock_fd != -1) {
+        shutdown(current->next_client->client->sock_fd, SHUT_RDWR);
+        close(current->next_client->client->sock_fd);
+    }
 
     // Free the client itself.
     free(current->next_client->client);
@@ -398,8 +401,11 @@ int remove_by_client_id(FILE *fp, client_node_t **head, int del_id) {
         free_inner_client_fields(&temp_node);
 
         // Shutdown and close the connection of the client.
-        shutdown(temp_node->client->sock_fd, SHUT_RDWR);
-        close(temp_node->client->sock_fd);
+        // -1 is when client tries to close other client sockets.
+        if (temp_node->client->sock_fd != -1) {
+            shutdown(temp_node->client->sock_fd, SHUT_RDWR);
+            close(temp_node->client->sock_fd);
+        }
 
         // Free the client itself.
         free(temp_node->client);
@@ -432,8 +438,11 @@ int remove_by_client_id(FILE *fp, client_node_t **head, int del_id) {
             free_inner_client_fields(&temp_node);
 
             // Shutdown and close the connection of the client.
-            shutdown(temp_node->client->sock_fd, SHUT_RDWR);
-            close(temp_node->client->sock_fd);
+            // -1 is when client tries to close other client sockets.
+            if ((*head)->client->sock_fd != -1) {
+                shutdown(temp_node->client->sock_fd, SHUT_RDWR);
+                close(temp_node->client->sock_fd);
+            }
 
             // Free the client itself.
             free(temp_node->client);

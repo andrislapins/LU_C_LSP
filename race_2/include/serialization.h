@@ -48,7 +48,7 @@ void serialize_msg_GI_response(
 );
 void deserialize_msg_GI_response(
     char *buffer, char *msg_type, game_t *game,
-    int *g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+    int *g_client_count, struct Player_info ***other_pi_arr_of_p
 );
 
 #endif

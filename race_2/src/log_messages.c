@@ -302,8 +302,8 @@ void log_received_LI_msg(FILE *fp, char *msg_type, int n_games, int *gid_arr) {
 }
 
 void log_received_GI_msg(
-    FILE *fp, char *msg_type, client_t *client, 
-    int g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+    FILE *fp, char *msg_type, client_t *client,
+    int g_client_count, struct Player_info ***p
 ) {
     log_time_header(fp);
     fprintf(
@@ -350,44 +350,44 @@ void log_received_GI_msg(
             fp,
             "%sPlayer ID%s: %d\n",
             ANSI_GREEN, ANSI_RESET_ALL,
-            g_clients[i]->player->ID
+            (*p)[i]->ID
         );
         fprintf(
             fp,
             "%sPlayer Name%s: %s%s%s\n",
             ANSI_GREEN, ANSI_RESET_ALL, ANSI_YELLOW,
-            g_clients[i]->player->name,
+            (*p)[i]->name,
             ANSI_YELLOW
         );
         fprintf(
             fp,
             "%sPlayer positon%s x: %f, y: %f\n",
             ANSI_GREEN, ANSI_RESET_ALL,
-            g_clients[i]->player->position.x, g_clients[i]->player->position.y
+            (*p)[i]->position.x, (*p)[i]->position.y
         );
         fprintf(
             fp,
             "%sPlayer angle%s: %f\n",
             ANSI_GREEN, ANSI_RESET_ALL,
-            g_clients[i]->player->angle
+            (*p)[i]->angle
         );
         fprintf(
             fp,
             "%sPlayer speed%s: %f\n",
             ANSI_GREEN, ANSI_RESET_ALL,
-            g_clients[i]->player->speed
+            (*p)[i]->speed
         );
         fprintf(
             fp,
             "%sPlayer acceleration%s: %f\n",
             ANSI_GREEN, ANSI_RESET_ALL,
-            g_clients[i]->player->acceleration
+            (*p)[i]->acceleration
         );
         fprintf(
             fp,
             "%sPlayer laps%s: %d\n\n",
             ANSI_GREEN, ANSI_RESET_ALL,
-            g_clients[i]->player->laps
+            (*p)[i]->laps
         );
     }
 
