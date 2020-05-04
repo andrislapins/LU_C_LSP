@@ -41,7 +41,7 @@ void err_die_server(FILE *fp, char* err_msg);
 FILE *change_log_output(FILE *fp, char *path);
 
 // Global structure initialization prototypes.
-void init_client(client_t **client);
+void init_client(client_t **client, int client_sock);
 void init_game(game_t **game, int chosen_field_id);
 void init_tracks();
 
@@ -78,7 +78,7 @@ void create_game_response(char *buffer, client_t *client) {
     client->game = game;
 
     // Create a password for the client.
-    generate_password(client);
+    generate_password(output, client);
 
     // Set a response back to the client.
     memset(buffer, 0, BUF_SIZE_WO_TYPE);
@@ -146,17 +146,16 @@ void game_info_response(char *buffer, client_t *client) {
     // Handling the message from a client.
     deserialize_msg_GI(buffer, &chosen_gid);
 
+    // Get the chosen game instance.
     chosen_game = get_game_by_id(&games_start, chosen_gid);
     if(chosen_game == NULL) {
         err_die_server(output, "Could not find the requested game!");
     }
 
-    // NOTE: Put this client searching in a seperate func.
-    // NOTE:! Every player joining (and the one who created) will be assigned
-    // a whole game instance to him. 
+    // Collect the players (client_t) of the chosen game.
     current = clients_start;
-
     g_client_count = 0;
+
     // OPTION: compare on adding "|| g_client_count < MAX_CLIENTS_PER_GAME".
     for(int i = 0; current != NULL; i++) {
         if(current->client->game->ID == chosen_gid) {
@@ -172,6 +171,48 @@ void game_info_response(char *buffer, client_t *client) {
     serialize_msg_GI_response(buffer, chosen_game, g_client_count, g_clients);
 
     log_game_info_response(output, client, chosen_gid);
+}
+
+void join_game_response(char *buffer, client_t *client) {
+    game_t *chosen_game;
+    int chosen_game_id;
+    char *client_name;
+
+    // Allocate and initialiase the names.
+    client_name = malloc(CLIENT_NAME_LEN);
+    if (client_name == NULL) {
+        err_die_server(output, "Could not allocate memory for client name!");
+    }
+
+    memset(client_name, '\0', CLIENT_NAME_LEN);
+
+    // Handling the message from a client.
+    deserialize_msg_JG(buffer, &chosen_game_id, client_name);
+
+    // Find and assign the new game for the client.
+    chosen_game = get_game_by_id(&games_start, chosen_game_id);
+    if(chosen_game == NULL) {
+        err_die_server(output, "Could not find the requested game!");
+    }
+
+    client->game = chosen_game;
+
+    // Copy the names to the corresponding fields.
+    strcpy(client->player->name, client_name);
+
+    // Create a password for the client.
+    generate_password(output, client);
+
+    // Set a response back to the client.
+    memset(buffer, 0, BUF_SIZE_WO_TYPE);
+    serialize_msg_CG_response(buffer, client);
+
+    free(client_name);
+
+    // NOTE: Notify other players!!!!
+
+    // Log the response.
+    log_join_game_response(output, client);
 }
 
 void handle_message(char *buffer, client_t *client) {
@@ -191,6 +232,8 @@ void handle_message(char *buffer, client_t *client) {
         list_games_response(buffer, client);
     } else if (strcmp(msg_type, "GI") == 0) {
         game_info_response(buffer, client);
+    } else if (strcmp(msg_type, "JG") == 0) {
+        join_game_response(buffer, client);
     } else {
         // NOTE: Have a function - print_log AND send_err_msg() in one func.
         sprintf(err_msg, "Received an unknown type - %s", msg_type);
@@ -198,12 +241,13 @@ void handle_message(char *buffer, client_t *client) {
     }
 }
 
-void handle_client(client_t *client) {
+void *handle_client(void *arg) {
     char    *buffer;
     char    err_msg[ERR_MSG_LEN];
     int     leave_flag, data_n, del_ret;
 
     leave_flag = 0;
+    client_t *client = (client_t*)arg;
 
     // Allocate and initialize buffer (one buffer per client).
     buffer = malloc(MAX_BUFFER_SIZE);
@@ -256,7 +300,8 @@ void handle_client(client_t *client) {
 int main(int argc, char **argv) {
     struct sockaddr_in  serv_addr, client_addr;
     socklen_t           client_addr_len;
-    int                 err, option, flag;
+    int                 err, option, flag, received_conn;
+    pthread_t tid;
 
     client_t *client;
     track_t *track;
@@ -294,7 +339,7 @@ int main(int argc, char **argv) {
     serv_addr.sin_addr.s_addr   = inet_addr(ip); // NOTE:? Should it be INADDR_ANY
     serv_addr.sin_port          = htons(port);
 
-    client_addr_len = sizeof(client_addr);
+    // client_addr_len = sizeof(client_addr);
 
     option = 1;
     err = setsockopt(listen_socket, SOL_SOCKET, SO_REUSEPORT | SO_REUSEADDR, (char*)&option, sizeof(option));
@@ -320,13 +365,37 @@ int main(int argc, char **argv) {
     init_tracks(&track);
 
     // Initialize client and define various client fields.
-    init_client(&client);
-    client->sock_fd = accept(listen_socket, (struct sockaddr*)&client_addr, &client_addr_len);
-    client->address = client_addr;
-    strcpy(client->ip, ip_addr(client_addr));
+    // NOTE: Might need to save in a different var the sock and then assign
+    // inside an if statement.
 
-    // NOTE: Manage in a thread.
-    handle_client(client);
+    while (1) {
+        client_addr_len = sizeof(client_addr);
+        received_conn = accept(
+            listen_socket, (struct sockaddr*)&client_addr, &client_addr_len
+        );
+
+        // NOTE:? Will the server really accept more conn than specified on listen().
+        if ((client_count + 1) >= MAX_CLIENTS_ON_SERVER) {
+            fprintf(output, "Denied connection to %s!", ip_addr(client_addr));
+            close(received_conn);
+            continue;
+        }
+
+        init_client(&client, received_conn);
+        client->address = client_addr;
+        strcpy(client->ip, ip_addr(client_addr));
+
+        pthread_create(&tid, NULL, &handle_client, (void*)client);
+
+        sleep(1);
+    }
+    // init_client(&client);
+    // client->sock_fd = accept(listen_socket, (struct sockaddr*)&client_addr, &client_addr_len);
+    // client->address = client_addr;
+    // strcpy(client->ip, ip_addr(client_addr));
+
+    // // NOTE: Manage in a thread.
+    // handle_client(client);
 
     /* Exit program gracefully */
 
@@ -379,7 +448,7 @@ FILE *change_log_output(FILE *fp, char *path) {
     return fp;
 }
 
-void init_client(client_t **client) {
+void init_client(client_t **client, int client_sock) {
     // Client struct allocation.
     *client = malloc(sizeof(client_t));
     if (*client == NULL) {
@@ -406,6 +475,7 @@ void init_client(client_t **client) {
 
     // Initialising the char arrays.
     memset((*client)->ip, '\0', IP_LEN);
+    memset((*client)->password, '\0', CLIENT_PASS_LEN);
     memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
 
     // Allocated field definitions.
@@ -416,6 +486,8 @@ void init_client(client_t **client) {
     (*client)->player->laps         = 0;
     (*client)->player->position.x   = 0;
     (*client)->player->position.y   = 0;
+
+    (*client)->sock_fd = client_sock;
 
     // Increase the count of players on the server.
     client_count++;

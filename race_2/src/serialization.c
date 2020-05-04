@@ -197,6 +197,7 @@ void serialize_msg_GI_response(
     buffer = serialize_string(buffer, game->game_h->name, GAME_NAME_LEN);
     buffer = serialize_int(buffer, &(game->game_h->WinnerPlayerID));
     buffer = serialize_int(buffer, &(g_client_count));
+
     // Serialize each player info struct.
     for(int i = 0; i < g_client_count; i++) {
         buffer = serialize_int(buffer, &(g_clients[i]->player->ID));
@@ -208,6 +209,7 @@ void serialize_msg_GI_response(
         buffer = serialize_float(buffer, g_clients[i]->player->acceleration);
         buffer = serialize_int(buffer, &(g_clients[i]->player->laps));
     }
+
     buffer = serialize_int(buffer, &(game->track->field->ID));
     buffer = serialize_string(buffer, game->track->field->name, FIELD_NAME_LEN);
     buffer = serialize_int(buffer, &(game->track->field->Width));
@@ -250,4 +252,26 @@ void deserialize_msg_GI_response(
 
     // Assign the pointer back to the calling function.
     *other_pi_arr_of_p = pi_arr_of_p;
+}
+
+void serialize_msg_JG(char *buffer, char *msg_type, int game_id, char *client_name) {
+    buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = serialize_int(buffer, &(game_id));
+    buffer = serialize_string(buffer, client_name , CLIENT_NAME_LEN);
+}
+
+void deserialize_msg_JG(char *buffer, int *game_id, char *client_name) {
+    buffer = deserialize_int(buffer, game_id);
+    buffer = deserialize_string(buffer, client_name , CLIENT_NAME_LEN);
+}
+
+void serialize_msg_JG_response(char *buffer, client_t *client) {
+    buffer = serialize_int(buffer, &(client->player->ID));
+    buffer = serialize_string(buffer, client->password, CLIENT_PASS_LEN);
+}
+
+void deserialize_msg_JG_response(char *buffer, char *msg_type, client_t *client) {
+    buffer = deserialize_string(buffer, msg_type, MSG_TYPE_LEN);
+    buffer = deserialize_int(buffer, &(client->player->ID));
+    buffer = deserialize_string(buffer, client->password, CLIENT_PASS_LEN);
 }

@@ -120,6 +120,16 @@ void log_list_games_response(FILE *fp, client_t *client) {
     );
 }
 
+void log_join_game_response(FILE *fp, client_t *client) {
+    log_time_header(fp);
+    log_client_info(fp, client);
+    fprintf(
+        fp, 
+        "Obtained ID - %d. Joined the game %s\n",
+        client->player->ID, client->game->game_h->name
+    );
+}
+
 /* Logs when deletion of instances occurs */
 
 void log_remove_client(FILE *fp, client_t *client) {
@@ -415,5 +425,32 @@ void log_received_GI_msg(
         "%sField heigth%s: %d\n",
         ANSI_GREEN, ANSI_RESET_ALL,
         client->game->track->field->Height
+    );
+}
+
+void log_received_JG_msg(FILE *fp, char *msg_type, client_t *client) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "%sReceived%s:\n",
+        ANSI_YELLOW, ANSI_RESET_ALL
+    );
+    fprintf(
+        fp,
+        "%sType%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        msg_type
+    );
+    fprintf(
+        fp,
+        "%sPlayer ID%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->player->ID
+    );
+    fprintf(
+        fp,
+        "%sPassword%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->password
     );
 }

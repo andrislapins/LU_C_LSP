@@ -75,7 +75,7 @@ typedef struct client {
 // Common helper functions.
 
 void print_array_in_hex(char *name, void* arr, int len);
-void generate_password(client_t *client);
+void generate_password(FILE *fp, client_t *client);
 char *ip_addr(struct sockaddr_in addr);
 void get_group_n_id(int *base, int *group, int *index);
 char *from_who(client_t *client);

@@ -17,7 +17,7 @@ char *deserialize_string(char *buffer, char *value, int len);
 
 /* === PROTOCOL TYPE SERIALIZATION/DESERIALIZATION === */
 
-void serialize_msg_CG(char *buffer, char *msg_type, char *player_name, char *game_name, int field_id);
+void serialize_msg_CG(char *buffer, char *msg_type, char *client_name, char *game_name, int field_id);
 void deserialize_msg_CG(char *buffer, char* client_name, char *game_name, int *field_id);
 void serialize_msg_CG_response(char *buffer, client_t *client);
 void deserialize_msg_CG_response(char *buffer, char *msg_type, client_t *client);
@@ -47,8 +47,13 @@ void serialize_msg_GI_response(
     client_t *g_clients[MAX_CLIENTS_PER_GAME]
 );
 void deserialize_msg_GI_response(
-    char *buffer, char *msg_type, game_t *game,
-    int *g_client_count, struct Player_info ***other_pi_arr_of_p
+    char *buffer, char *msg_type, game_t *game, int *g_client_count,
+    struct Player_info ***other_pi_arr_of_p
 );
+
+void serialize_msg_JG(char *buffer, char *msg_type, int game_id, char *client_name);
+void deserialize_msg_JG(char *buffer, int *game_id, char *client_name);
+void serialize_msg_JG_response(char *buffer, client_t *client);
+void deserialize_msg_JG_response(char *buffer, char *msg_type, client_t *client);
 
 #endif

@@ -20,7 +20,7 @@ void print_array_in_hex(char *name, void *arr, int len) {
     printf("\n");
 }
 
-void generate_password(client_t *client) {
+void generate_password(FILE *fp, client_t *client) {
     srand((unsigned int)time(0));
     int i, r;
     char a[66];
@@ -43,9 +43,10 @@ void generate_password(client_t *client) {
         r = rand() % 65;
         client->password[i] = a[r];
     }
-    client->password[i] = '\0';
 
-    log_pass_generated(stdout, client);
+    client->password[CLIENT_PASS_LEN-1] = '\0';
+
+    log_pass_generated(fp, client);
 }
 
 char *ip_addr(struct sockaddr_in addr) {

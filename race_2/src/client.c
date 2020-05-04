@@ -7,6 +7,9 @@
 // NOTE: Have %s p/h to which I pass fmt([string]) func which 
 // appends/prepends my format rules.
 // NOTE: Handle overflows for number buffer like in create_game() func.
+// NOTE: Client code takes the first chose when asking for info/description
+// for field and game. Allow a client to ask multiple times in a loop
+// until client declares that he has made his choice, by exiting the loop.
 
 // LLs and variables of the main game types.
 client_node_t *clients_start = NULL;
@@ -35,7 +38,56 @@ void init_tracks();
 
 /* The main functions for communication */
 
-void list_games(char *buffer, client_t *client) {
+void join_game(char *buffer, client_t *client, int game_id) {
+    char msg_type[MSG_TYPE_LEN];
+    char    *name_buf;
+    int     p_name_allowed_size = CLIENT_NAME_LEN - 1;
+
+    /* JOIN GAME */
+
+    strcpy(msg_type, "JG\0");
+
+    // Allocate and initialize the buffer where to store names.
+    name_buf = malloc(MSG_BUF_LEN);
+    if (name_buf == NULL) {
+        err_die_client(output, "Could not allocate memory for name buffer!");
+    }
+
+    memset(name_buf, '\0', MSG_BUF_LEN);
+
+    /* Get and set the name of the client */
+
+    printf("Your name? (max %d symbols): ", p_name_allowed_size);
+    fgets(name_buf, MSG_BUF_LEN, stdin);
+
+    // Set the last element of name_buf to 0 for checking the length. 
+    name_buf[MSG_BUF_LEN-1] = '\0';
+    if (strlen(name_buf) > p_name_allowed_size) {
+        err_die_client(output, "The name is too long!");
+    }
+
+    name_buf[strlen(name_buf)-1] = '\0';
+    strncpy(client->player->name, name_buf, p_name_allowed_size);
+
+    /* Serialize the data */
+
+    memset(buffer, '\0', MAX_BUFFER_SIZE);
+    serialize_msg_JG(buffer, msg_type, game_id, client->player->name);
+
+    send_n_recv(buffer, msg_type, client->sock_fd);
+
+    memset(client->password, '\0', CLIENT_PASS_LEN); ///
+    deserialize_msg_JG_response(buffer, msg_type, client);
+
+    // Log the response.
+    log_received_JG_msg(output, msg_type, client);
+
+    free(name_buf);
+}
+
+// list_games return the chosen game's ID which client will join.
+// Function returns 0 if there is no game on the server.
+int list_games(char *buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN];
     char num_str[DIGITS_LEN];
     int  *gid_arr; // Store array of received game IDs.
@@ -64,7 +116,7 @@ void list_games(char *buffer, client_t *client) {
 
     // If the are no game on the server.
     if (n_games == 0) {
-        return;
+        return 0;
     }
     
     /* GAME INFO */
@@ -81,6 +133,21 @@ void list_games(char *buffer, client_t *client) {
     if (chose <= 0) {
         err_die_client(output, "You provided an invalid number!");
     }
+
+    // Check whether client chose an existing game ID.
+    int valid_chose = 0;
+    for (int i = 0; i < n_games; i++) {
+        if (chose == gid_arr[i]) {
+            valid_chose = 1;
+            break;
+        }
+    }
+
+    if (valid_chose == 0) {
+        err_die_client(output, "There is no such game ID!");
+    }
+
+    client->game->ID = chose;
 
     // Reinitialize the buffer for data serialization.
     memset(buffer, '\0', MAX_BUFFER_SIZE);
@@ -105,6 +172,8 @@ void list_games(char *buffer, client_t *client) {
 
     free(*p);
     free(gid_arr);
+
+    return chose;
 }
 
 int get_number_of_fields(char* buffer, client_t *client) {
@@ -182,7 +251,6 @@ void create_game(char *buffer, client_t *client, int field_id) {
     char    *name_buf;
     int     p_name_allowed_size = CLIENT_NAME_LEN - 1;
     int     g_name_allowed_size = GAME_NAME_LEN - 1;
-    // game_t *game;
 
     /* CREATE GAME */
 
@@ -227,7 +295,8 @@ void create_game(char *buffer, client_t *client, int field_id) {
     name_buf[strlen(name_buf)-1] = '\0';
     strncpy(client->game->game_h->name, name_buf, g_name_allowed_size);
 
-    // Serialize the data.
+    /* Serialize the data */
+
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_CG(
         buffer, msg_type, client->player->name, 
@@ -253,6 +322,7 @@ int main(int argc, char **argv) {
 
     client_t            *client;
     int                 field_id;
+    int                 game_id;
 
     signal(SIGINT, handle_sigint);
 
@@ -316,7 +386,8 @@ int main(int argc, char **argv) {
     create_game(buffer, client, field_id);
 
     // USER-OPT-JOIN branch.
-    list_games(buffer, client/* , &g_clients */);
+    game_id = list_games(buffer, client);
+    join_game(buffer, client, game_id);
 
     /* Exit program gracefully */
 
@@ -328,8 +399,6 @@ int main(int argc, char **argv) {
     remove_all_clients(output, &clients_start);
     remove_all_tracks(output, &tracks_start);
     remove_all_games(output, &games_start);
-
-    // free(g_clients);
 
     printf("Goodbye!\n");
     exit(EXIT_SUCCESS);
