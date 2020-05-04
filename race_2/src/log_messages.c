@@ -100,6 +100,17 @@ void log_field_info_response(FILE *fp, client_t *client, int chosen_field_id) {
     );
 }
 
+void log_game_info_response(FILE *fp, client_t *client, int chosen_game_id) {
+    log_time_header(fp);
+    log_client_info(fp, client);
+    fprintf(
+        fp,
+        "Sent more info about game - %d\n", 
+        chosen_game_id
+    );
+}
+
+
 void log_list_games_response(FILE *fp, client_t *client) {
     log_time_header(fp);
     log_client_info(fp, client);
@@ -111,12 +122,12 @@ void log_list_games_response(FILE *fp, client_t *client) {
 
 /* Logs when deletion of instances occurs */
 
-void log_remove_client(FILE *fp, char *name) {
+void log_remove_client(FILE *fp, client_t *client) {
     log_time_header(fp);
     fprintf(
         fp,
         "Deleted client - %s\n",
-        name // NOTE:? Change to from_whom() or print ip
+        from_who(client)
     );
 }
 
@@ -288,4 +299,121 @@ void log_received_LI_msg(FILE *fp, char *msg_type, int n_games, int *gid_arr) {
             gid_arr[i]
         );
     }
+}
+
+void log_received_GI_msg(
+    FILE *fp, char *msg_type, client_t *client, 
+    int g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "%sReceived%s:\n",
+        ANSI_YELLOW, ANSI_RESET_ALL
+    );
+    fprintf(
+        fp,
+        "%sType%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        msg_type
+    );
+
+    // Displaying game header info.
+    fprintf(
+        fp,
+        "%sGame status%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->game_h->status
+    );
+    fprintf(
+        fp,
+        "%sGame name%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->game_h->name
+    );
+    fprintf(
+        fp,
+        "%sGame winner ID%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->game_h->WinnerPlayerID
+    );
+    fprintf(
+        fp,
+        "%sPlayer count%s: %d\n\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        g_client_count
+    );
+
+    // Displaying player info one by one.
+    for(int i = 0; i < g_client_count; i++) {
+        fprintf(
+            fp,
+            "%sPlayer ID%s: %d\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            g_clients[i]->player->ID
+        );
+        fprintf(
+            fp,
+            "%sPlayer Name%s: %s%s%s\n",
+            ANSI_GREEN, ANSI_RESET_ALL, ANSI_YELLOW,
+            g_clients[i]->player->name,
+            ANSI_YELLOW
+        );
+        fprintf(
+            fp,
+            "%sPlayer positon%s x: %f, y: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            g_clients[i]->player->position.x, g_clients[i]->player->position.y
+        );
+        fprintf(
+            fp,
+            "%sPlayer angle%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            g_clients[i]->player->angle
+        );
+        fprintf(
+            fp,
+            "%sPlayer speed%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            g_clients[i]->player->speed
+        );
+        fprintf(
+            fp,
+            "%sPlayer acceleration%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            g_clients[i]->player->acceleration
+        );
+        fprintf(
+            fp,
+            "%sPlayer laps%s: %d\n\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            g_clients[i]->player->laps
+        );
+    }
+
+    // Displaying info about the field.
+    fprintf(
+        fp,
+        "%sField ID%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->track->field->ID
+    );
+    fprintf(
+        fp,
+        "%sField name%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->track->field->name
+    );
+    fprintf(
+        fp,
+        "%sField width%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->track->field->Width
+    );
+    fprintf(
+        fp,
+        "%sField heigth%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        client->game->track->field->Height
+    );
 }

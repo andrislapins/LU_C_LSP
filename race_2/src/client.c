@@ -6,6 +6,7 @@
 
 // NOTE: Have %s p/h to which I pass fmt([string]) func which 
 // appends/prepends my format rules.
+// NOTE: Handle overflows for number buffer like in create_game() func.
 
 // LLs and variables of the main game types.
 client_node_t *clients_start = NULL;
@@ -28,18 +29,24 @@ void change_log_output(FILE *fp, char *path);
 
 // Global structure initialization prototypes.
 void init_client(client_t **client);
+void init_game(game_t **game, int chosen_field_id);
+void init_tracks();
 
 /* The main functions for communication */
 
-void list_games(char *buffer, client_t *client) {
+void list_games(char *buffer, client_t *client, client_t ***g_clients) {
     char msg_type[MSG_TYPE_LEN];
     char num_str[DIGITS_LEN];
     // Store array of received game IDs.
     int *gid_arr;
-    int n_games;//, chose;
+    int n_games, chose, g_client_count;
 
-    memset(num_str, '\0', DIGITS_LEN);
+    /* LIST GAME */
+
     strcpy(msg_type, "LI\0");
+
+    // Initialize the buffer for numbers.
+    memset(num_str, '\0', DIGITS_LEN);
 
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_LI(buffer, msg_type);
@@ -51,35 +58,71 @@ void list_games(char *buffer, client_t *client) {
     // Log the response.
     log_received_LI_msg(output, msg_type, n_games, gid_arr);
 
-    free(gid_arr);
-    // printf("Choose a ... to get more info: ");
-    // fgets(num_str, DIGITS_LEN, stdin);
-
-    // chose = atoi(num_str);
-    // if (chose <= 0) {
-    //     err_die_client(output, "You provided an invalid number!");
-    // }
-    // printf("You chose game w/ ID: %d\n", chose);
-
+    // If the are no game on the server.
+    if (n_games == 0) {
+        return;
+    }
+    
     /* GAME INFO */
 
-    // strncpy(msg_type, "GI\0", 3);
+    strncpy(msg_type, "GI\0", 3);
 
-    // memset(buffer, 0, MAX_BUFFER_SIZE);
-    // serialize_msg_GI(buffer, msg_type);
+    // Reinitialize the buffer for numbers.
+    memset(num_str, '\0', DIGITS_LEN);
 
-    // send_n_recv(buffer, msg_type, client->sock_fd);
+    printf("Choose one of the game IDs to get more info: ");
+    fgets(num_str, DIGITS_LEN, stdin);
 
-    // deserialize_msg_GI_response(buffer);
+    chose = atoi(num_str);
+    if (chose <= 0) {
+        err_die_client(output, "You provided an invalid number!");
+    }
+
+    // Reinitialize the buffer for data serialization.
+    memset(buffer, '\0', MAX_BUFFER_SIZE);
+    serialize_msg_GI(buffer, msg_type, chose);
+
+    send_n_recv(buffer, msg_type, client->sock_fd);
+
+    // Create multiple client instances on client-side.
+    g_clients = malloc(MAX_CLIENTS_PER_GAME * sizeof(*g_clients));
+
+    for(int i = 0; i < MAX_CLIENTS_PER_GAME; i++) {
+        init_client(g_clients[i]);
+        (*g_clients[i])->sock_fd = -1;
+        (*g_clients[i])->game = client->game;
+    }
+
+    // Use client/game/track allocation and init functions from server.
+    // And use push instances in the same way.
+    // I guess client will have to store clients like in server.
+    // But I could assign the same pointer of game/track to every client.
+    // Or just have multiple clients in clients's LL.
+    // Any way I will have to update just client values NOOOT client game/track
+    // values specifially.
+    // Thats why avoid pushing/allocating multiple games/tracks (that
+    // may be the reason why client crashes).
+
+    deserialize_msg_GI_response(buffer, msg_type, client->game, &g_client_count, *g_clients); 
+
+    // Log the response.
+    log_received_GI_msg(output, msg_type, client, g_client_count, *g_clients);
+
+    free(gid_arr);
+    // free(g_clients);
 }
 
 int get_number_of_fields(char* buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN];
     char num_str[DIGITS_LEN];
     int  n_field_ids, chose;
+    track_t *track;
+
+    /* GET_NUMBER_OF_FIELDS */
+
+    strcpy(msg_type, "NF\0");
 
     memset(num_str, '\0', DIGITS_LEN);
-    strcpy(msg_type, "NF\0");
 
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_NF(buffer, msg_type);
@@ -88,6 +131,15 @@ int get_number_of_fields(char* buffer, client_t *client) {
 
     deserialize_msg_NF_response(buffer, msg_type, &(n_field_ids));
 
+    /* FIELD INFO */
+
+    strncpy(msg_type, "FI\0", 3);
+
+    // Allocate, initialize and assign the track to client.
+    init_tracks(&track);
+    client->game->track = track;
+
+    // Getting the chosen field ID.
     printf("Choose a field in range from 1 to %d to get more info: ", n_field_ids);
     fgets(num_str, DIGITS_LEN, stdin);
 
@@ -96,10 +148,7 @@ int get_number_of_fields(char* buffer, client_t *client) {
         err_die_client(output, "You provided an invalid number!");
     }
 
-    /* FIELD INFO */
-
-    strncpy(msg_type, "FI\0", 3);
-
+    // Reinitialize buffer for data serialization.
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_FI(buffer, msg_type, chose);
 
@@ -130,6 +179,17 @@ void create_game(char *buffer, client_t *client, int field_id) {
     char    *name_buf;
     int     p_name_allowed_size = CLIENT_NAME_LEN - 1;
     int     g_name_allowed_size = GAME_NAME_LEN - 1;
+    game_t *game;
+
+    /* CREATE GAME */
+
+    strcpy(msg_type, "CG\0");
+
+    // Create a new game instance on the client.
+    init_game(&game, field_id);
+
+    // Assign the game to the client.
+    client->game = game;
 
     // Allocate and initialize the buffer where to store names.
     name_buf = malloc(MSG_BUF_LEN);
@@ -138,9 +198,6 @@ void create_game(char *buffer, client_t *client, int field_id) {
     }
 
     memset(name_buf, '\0', MSG_BUF_LEN);
-
-    // Set the message type.
-    strcpy(msg_type, "CG\0");
 
     /* Get and set the name of the client */
 
@@ -188,8 +245,6 @@ void create_game(char *buffer, client_t *client, int field_id) {
     log_received_CG_msg(output, msg_type, client);
 
     free(name_buf);
-    // free(client_name);
-    // free(game_name);
 
     // NOTE: Sit in while loop and get notified about new players joining (max 4) 
     // until want to procees to send a START GAME request.
@@ -199,6 +254,7 @@ int main(int argc, char **argv) {
     struct sockaddr_in  serv_addr;
     int                 err, flag, serv_sock;
 
+    client_t    **g_clients;
     client_t    *client;
     int         field_id;
 
@@ -259,9 +315,12 @@ int main(int argc, char **argv) {
 
     /* The lifecycle of the race game */
 
-    field_id = get_number_of_fields(buffer, client);
+    // USER-OPT-CREATE branch.
     create_game(buffer, client, field_id);
-    list_games(buffer, client);
+    field_id = get_number_of_fields(buffer, client);
+
+    // USER-OPT-JOIN branch.
+    list_games(buffer, client, &g_clients);
 
     /* Exit program gracefully */
 
@@ -273,6 +332,8 @@ int main(int argc, char **argv) {
     remove_all_clients(output, &clients_start);
     remove_all_tracks(output, &tracks_start);
     remove_all_games(output, &games_start);
+
+    free(g_clients);
 
     printf("Goodbye!\n");
     exit(EXIT_SUCCESS);
@@ -336,7 +397,7 @@ void init_client(client_t **client) {
     // Client struct allocation.
     *client = malloc(sizeof(client_t));
     if (*client == NULL) {
-        err_die_client(output, "Could not allocate memory for client!");
+        err_die_client(output, "Could not allocate memory for a client!");
     }
 
     // Client IP address allocation.
@@ -357,48 +418,174 @@ void init_client(client_t **client) {
         err_die_client(output, "Could not allocate memory for client's player!");
     }
 
-    // Define client's game struct.
-    (*client)->game = malloc(sizeof(game_t));
-    if ((*client)->game == NULL) {
-        err_die_client(output, "Could not allocate memory for client's game!");
-    }
-
-    // Define client's game header struct.
-    (*client)->game->game_h = malloc(sizeof(struct Game));
-    if ((*client)->game->game_h == NULL) {
-        err_die_client(output, "Could not allocate memory for client's game header!");
-    }
-
-    // Define client's game track.
-    (*client)->game->track = malloc(sizeof(track_t));
-    if ((*client)->game->track == NULL) {
-        err_die_client(output, "Could not allocate memory for client's game track!");
-    }
-
-    (*client)->game->track->field = malloc(sizeof(struct Field));
-    if ((*client)->game->track->field == NULL) {
-        err_die_client(output, "Could not allocate memory for client's game track field!");
-    }
-
-    // Define client's game start line.
-    (*client)->game->track->start_line = malloc(sizeof(struct Line));
-    if ((*client)->game->track->start_line == NULL) {
-        err_die_client(output, "Could not allocate memory for client's game track start line!");
-    }
-
-    // Define client's game main line.
-    (*client)->game->track->main_line = malloc(sizeof(struct Line));
-    if ((*client)->game->track->main_line == NULL) {
-        err_die_client(output, "Could not allocate memory for client's game track main line!");
-    }
-
     // Initialising the char arrays.
     memset((*client)->ip, '\0', IP_LEN);
     memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
-    memset((*client)->game->game_h->name, '\0', GAME_NAME_LEN);
 
-    // Save client, game, track to the globally accesable lists.
+    // Allocated field definitions.
+    (*client)->player->ID           = 0;
+    (*client)->player->angle        = 0.0f;
+    (*client)->player->speed        = 0.0f;
+    (*client)->player->acceleration = 0.0f;
+    (*client)->player->laps         = 0;
+    (*client)->player->position.x   = 0;
+    (*client)->player->position.y   = 0;
+
+    // Save this client in the global clients list.
     push_client(&clients_start, client);
-    push_game(&games_start, &((*client)->game));
-    push_track(&tracks_start, &((*client)->game->track));
 }
+
+void init_game(game_t **game, int chosen_field_id) {
+    track_t *chosen_track;
+
+    // Game struct allocation.
+    *game = malloc(sizeof(game_t));
+    if (*game == NULL) {
+        err_die_client(output, "Could not allocate memory for game!");
+    }
+
+    // Game header allocation.
+    (*game)->game_h = malloc(sizeof(struct Game));
+    if ((*game)->game_h == NULL) {
+        err_die_client(output, "Could not allocate memory for game!");
+    }
+
+    // Initialising the char arrays.
+    memset((*game)->game_h->name, '\0', GAME_NAME_LEN);
+
+     // Allocated field definitions.
+    (*game)->ID                        = 0;
+    (*game)->game_h->status            = 0;
+    (*game)->game_h->WinnerPlayerID    = -1;
+
+    // Assigning a field to the game.
+    chosen_track = get_track_by_id(&tracks_start, chosen_field_id);
+    if (chosen_track == NULL) {
+        err_die_client(output, "Could not find the requested field!");
+    }
+
+    (*game)->track = chosen_track;
+
+    // Save this game in the global games list.
+    push_game(&games_start, game);
+}
+
+void init_tracks(track_t **track) {
+    // Track struct allocation.
+    *track = malloc(sizeof(track_t));
+    if (track == NULL) {
+        err_die_client(output, "Could not allocate memory for a track!");
+    }
+
+    // Track field allocation.
+    (*track)->field = malloc(sizeof(struct Field));
+    if (track == NULL) {
+        err_die_client(output, "Could not allocate memory for a field!");
+    }
+
+    // Track start line allocation.
+    (*track)->start_line = malloc(sizeof(struct Line));
+    if ((*track)->start_line == NULL) {
+        err_die_client(output, "Could not allocate memory for a field's start line!");
+    }
+
+    // Tracks main line allocation.
+    (*track)->main_line = malloc(sizeof(struct Line));
+    if ((*track)->main_line == NULL) {
+        err_die_client(output, "Could not allocate memory for a field's main line!");
+    }
+
+    // Initialising the char arrays.
+    memset((*track)->field->name, '\0', FIELD_NAME_LEN);
+
+    // Allocated field definitions.
+    (*track)->n_extra_lines            = 0;
+
+    (*track)->field->ID                = 0;
+    (*track)->field->Width             = 0;
+    (*track)->field->Height            = 0;
+
+    (*track)->start_line->beggining.x  = 0.0f;
+    (*track)->start_line->beggining.y  = 0.0f;
+    (*track)->start_line->end.x        = 0.0f;
+    (*track)->start_line->end.y        = 0.0f;
+
+    (*track)->main_line->beggining.x   = 0.0f;
+    (*track)->main_line->beggining.y   = 0.0f;
+    (*track)->main_line->end.x         = 0.0f;
+    (*track)->main_line->end.y         = 0.0f;
+
+    // Save this track in the global tracks list.
+    push_track(&tracks_start, track);
+}
+
+// void init_client(client_t **client) { // Initial client initialization.
+//     // Client struct allocation.
+//     *client = malloc(sizeof(client_t));
+//     if (*client == NULL) {
+//         err_die_client(output, "Could not allocate memory for client!");
+//     }
+
+//     // Client IP address allocation.
+//     (*client)->ip = malloc(IP_LEN);
+//     if ((*client)->ip == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's IP!");
+//     }
+
+//     // Client password allocation.
+//     (*client)->password = malloc(CLIENT_PASS_LEN);
+//     if ((*client)->password == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's password!");
+//     }
+
+//     // Client player info struct allocation.
+//     (*client)->player = malloc(sizeof(struct Player_info));
+//     if ((*client)->player == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's player!");
+//     }
+
+//     // Define client's game struct.
+//     (*client)->game = malloc(sizeof(game_t));
+//     if ((*client)->game == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's game!");
+//     }
+
+//     // Define client's game header struct.
+//     (*client)->game->game_h = malloc(sizeof(struct Game));
+//     if ((*client)->game->game_h == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's game header!");
+//     }
+
+//     // Define client's game track.
+//     (*client)->game->track = malloc(sizeof(track_t));
+//     if ((*client)->game->track == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's game track!");
+//     }
+
+//     (*client)->game->track->field = malloc(sizeof(struct Field));
+//     if ((*client)->game->track->field == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's game track field!");
+//     }
+
+//     // Define client's game start line.
+//     (*client)->game->track->start_line = malloc(sizeof(struct Line));
+//     if ((*client)->game->track->start_line == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's game track start line!");
+//     }
+
+//     // Define client's game main line.
+//     (*client)->game->track->main_line = malloc(sizeof(struct Line));
+//     if ((*client)->game->track->main_line == NULL) {
+//         err_die_client(output, "Could not allocate memory for client's game track main line!");
+//     }
+
+//     // Initialising the char arrays.
+//     memset((*client)->ip, '\0', IP_LEN);
+//     memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
+//     memset((*client)->game->game_h->name, '\0', GAME_NAME_LEN);
+
+//     // Save client, game, track to the globally accesable lists.
+//     push_client(&clients_start, client);
+//     push_game(&games_start, &((*client)->game));
+//     push_track(&tracks_start, &((*client)->game->track));
+// }

@@ -35,11 +35,20 @@ void deserialize_msg_FI_response(char *buffer, char *msg_type, track_t *track);
 void serialize_msg_LI(char *buffer, char *msg_type);
 void deserialize_msg_LI();
 void serialize_msg_LI_response(char *buffer, int count_of_games, int **gid_arr);
-void deserialize_msg_LI_response(char *buffer, char *msg_type, int *n_game_ids, int **game_ids_arr);
+void deserialize_msg_LI_response(
+    char *buffer, char *msg_type, int *n_game_ids, 
+    int **game_ids_arr
+);
 
 void serialize_msg_GI(char *buffer, char *msg_type, int chose);
 void deserialize_msg_GI(char *buffer, int *chose);
-void serialize_msg_GI_response(char *buffer);
-void deserialize_msg_GI_response(char *buffer, char *msg_type);
+void serialize_msg_GI_response(
+    char *buffer, game_t *game, int g_client_count, 
+    client_t *g_clients[MAX_CLIENTS_PER_GAME]
+);
+void deserialize_msg_GI_response(
+    char *buffer, char *msg_type, game_t *game,
+    int *g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+);
 
 #endif

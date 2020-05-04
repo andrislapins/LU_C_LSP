@@ -43,7 +43,7 @@ FILE *change_log_output(FILE *fp, char *path);
 // Global structure initialization prototypes.
 void init_client(client_t **client);
 void init_game(game_t **game, int chosen_field_id);
-void init_tracks();;
+void init_tracks();
 
 void create_game_response(char *buffer, client_t *client) {
     game_t  *game;
@@ -138,7 +138,40 @@ void list_games_response(char *buffer, client_t *client) {
 }
 
 void game_info_response(char *buffer, client_t *client) {
-    //
+    client_t *g_clients[MAX_CLIENTS_PER_GAME];
+    game_t *chosen_game;
+    client_node_t *current;
+    int chosen_gid, g_client_count;
+
+    // Handling the message from a client.
+    deserialize_msg_GI(buffer, &chosen_gid);
+
+    chosen_game = get_game_by_id(&games_start, chosen_gid);
+    if(chosen_game == NULL) {
+        err_die_server(output, "Could not find the requested game!");
+    }
+
+    // NOTE: Put this client searching in a seperate func.
+    // NOTE:! Every player joining (and the one who created) will be assigned
+    // a whole game instance to him. 
+    current = clients_start;
+
+    g_client_count = 0;
+    // OPTION: compare on adding "|| g_client_count < MAX_CLIENTS_PER_GAME".
+    for(int i = 0; current != NULL; i++) {
+        if(current->client->game->ID == chosen_gid) {
+            g_clients[g_client_count] = current->client;
+            g_client_count++;
+        }
+
+        current = current->next_client;
+    }
+
+    // Set a response back to the client.
+    memset(buffer, '\0', BUF_SIZE_WO_TYPE);
+    serialize_msg_GI_response(buffer, chosen_game, g_client_count, g_clients);
+
+    log_game_info_response(output, client, chosen_gid);
 }
 
 void handle_message(char *buffer, client_t *client) {
@@ -190,7 +223,7 @@ void handle_client(client_t *client) {
             if (strlen(buffer) > 0) {
                 // Check the msg type and handle accordingly.
                 handle_message(buffer, client);
-                // Send the request back to client.
+                // Send the requested data to the client.
                 data_n = send(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
                 if (data_n < 0) {
                     err_die_server(output, "An error occurred sending a message!");
@@ -274,7 +307,7 @@ int main(int argc, char **argv) {
         err_die_server(output, "Binding failed!");
     }
 
-    err = listen(listen_socket, MAX_CLIENTS);
+    err = listen(listen_socket, MAX_CLIENTS_ON_SERVER);
     if (err < 0) {
         err_die_server(output, "Listening failed!");
     }
@@ -412,7 +445,7 @@ void init_game(game_t **game, int chosen_field_id) {
      // Allocated field definitions.
     (*game)->ID                        = ++game_id;
     (*game)->game_h->status            = 0;
-    (*game)->game_h->WinnerPlayerID    = 0;
+    (*game)->game_h->WinnerPlayerID    = -1;
 
     // Assigning a field to the game.
     chosen_track = get_track_by_id(&tracks_start, chosen_field_id);
@@ -465,15 +498,15 @@ void init_tracks(track_t **track) {
     (*track)->field->Height            = 12;
     strcpy((*track)->field->name, "Grand Tour");
 
-    (*track)->start_line->beggining.x  = 15.1;
-    (*track)->start_line->beggining.y  = 2.1;
-    (*track)->start_line->end.x        = 15.1;
-    (*track)->start_line->end.y        = 5.1;
+    (*track)->start_line->beggining.x  = 15.1f;
+    (*track)->start_line->beggining.y  = 2.1f;
+    (*track)->start_line->end.x        = 15.1f;
+    (*track)->start_line->end.y        = 5.1f;
 
-    (*track)->main_line->beggining.x   = 10.1;
-    (*track)->main_line->beggining.y   = 5.1;
-    (*track)->main_line->end.x         = 25.1;
-    (*track)->main_line->end.y         = 6.1;
+    (*track)->main_line->beggining.x   = 10.1f;
+    (*track)->main_line->beggining.y   = 5.1f;
+    (*track)->main_line->end.x         = 25.1f;
+    (*track)->main_line->end.y         = 6.1f;
 
     // Increase the count of tracks on the server.
     track_count++;

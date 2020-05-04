@@ -146,13 +146,16 @@ int pop_client(FILE* fp, client_node_t **head) {
     next_node = (*head)->next_client;
 
     // Log the action.
-    log_remove_client(fp, (*head)->client->player->name);
+    log_remove_client(fp, (*head)->client);
 
     free_inner_client_fields(head);
 
     // Shutdown and close the connection of the client.
-    shutdown((*head)->client->sock_fd, SHUT_RDWR);
-    close((*head)->client->sock_fd);
+    // -1 is when client tries to close other client sockets.
+    if ((*head)->client->sock_fd != -1) {
+        shutdown((*head)->client->sock_fd, SHUT_RDWR);
+        close((*head)->client->sock_fd);
+    }
 
     // Free the client itself.
     free((*head)->client);
@@ -235,7 +238,7 @@ int remove_last_client(FILE *fp, client_node_t **head) {
 
     if ((*head)->next_client == NULL) {
         // Log the action.
-        log_remove_client(fp, (*head)->client->player->name);
+        log_remove_client(fp, (*head)->client);
 
         free_inner_client_fields(head);
 
@@ -261,7 +264,7 @@ int remove_last_client(FILE *fp, client_node_t **head) {
     }
 
     // Log the action.
-    log_remove_client(fp, current->next_client->client->player->name);
+    log_remove_client(fp, current->next_client->client);
 
     free_inner_client_fields(&(current->next_client));
 
@@ -386,7 +389,7 @@ int remove_by_client_id(FILE *fp, client_node_t **head, int del_id) {
     // If the head_pointer has the ID.
     if ((*head)->client->player->ID == del_id) {
         // Log the action.
-        log_remove_client(fp, (*head)->client->player->name);
+        log_remove_client(fp, (*head)->client);
 
         // Exchange the pointers.
         temp_node = *head;
@@ -420,7 +423,7 @@ int remove_by_client_id(FILE *fp, client_node_t **head, int del_id) {
 
         if (current->client->player->ID == del_id) {
             // Log the action.
-            log_remove_client(fp, current->client->player->name);
+            log_remove_client(fp, current->client);
             
             // Exchange the pointers.
             temp_node = current;

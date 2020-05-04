@@ -18,11 +18,12 @@
 
 #include "protocol.h"
 
-#define IP_LEN      17
-#define PORT        9999
-#define MAX_CLIENTS 4
+#define IP_LEN                  17
+#define PORT                    9999
+#define MAX_CLIENTS_ON_SERVER   32
+#define MAX_CLIENTS_PER_GAME    4
 
-#define MAX_BUFFER_SIZE  256
+#define MAX_BUFFER_SIZE  512
 #define BUF_SIZE_WO_TYPE MAX_BUFFER_SIZE - 3
 #define DIGITS_LEN       5 // To (de)serilaize digits of length 4.
 

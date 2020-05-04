@@ -14,13 +14,18 @@ void log_create_game_response(FILE *fp, client_t *client);
 void log_get_number_of_fields_response(FILE *fp, client_t *client);
 void log_field_info_response(FILE *fp, client_t *client, int chosen_field_id);
 void log_list_games_response(FILE *fp, client_t *client);
+void log_game_info_response(FILE *fp, client_t *client, int chosen_game_id);
 
-void log_remove_client(FILE *fp, char *name);
+void log_remove_client(FILE *fp, client_t *client);
 void log_remove_game(FILE *fp, char *name);
 void log_remove_track(FILE *fp, char *name);
 
 void log_received_CG_msg(FILE *fp,char *msg_type, client_t *client);
 void log_received_FI_msg(FILE *fp,char *msg_type, client_t *client);
 void log_received_LI_msg(FILE *fp, char *msg_type, int n_games, int *gid_arr);
+void log_received_GI_msg(
+    FILE *fp, char *msg_type, client_t *client, 
+    int g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+);
 
 #endif

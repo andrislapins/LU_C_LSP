@@ -180,7 +180,62 @@ void deserialize_msg_LI_response(char *buffer, char *msg_type, int *n_game_ids, 
 
 /* msg GAME INFO serialization/deserialization */
 
-void serialize_msg_GI(char *buffer, char *msg_type, int chose);
-void deserialize_msg_GI(char *buffer, int *chose);
-void serialize_msg_GI_response(char *buffer);
-void deserialize_msg_GI_response(char *buffer, char *msg_type);
+void serialize_msg_GI(char *buffer, char *msg_type, int chose) {
+    buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = serialize_int(buffer, &(chose));
+}
+
+void deserialize_msg_GI(char *buffer, int *chose) {
+    buffer = deserialize_int(buffer, chose);
+}
+
+void serialize_msg_GI_response(
+    char *buffer, game_t *game, int g_client_count, 
+    client_t *g_clients[MAX_CLIENTS_PER_GAME]
+) {
+    buffer = serialize_int(buffer, &(game->game_h->status));
+    buffer = serialize_string(buffer, game->game_h->name, GAME_NAME_LEN);
+    buffer = serialize_int(buffer, &(game->game_h->WinnerPlayerID));
+    buffer = serialize_int(buffer, &(g_client_count));
+    // Serialize each player info struct.
+    for(int i = 0; i < g_client_count; i++) {
+        buffer = serialize_int(buffer, &(g_clients[i]->player->ID));
+        buffer = serialize_string(buffer, g_clients[i]->player->name, CLIENT_NAME_LEN);
+        buffer = serialize_float(buffer, g_clients[i]->player->position.x);
+        buffer = serialize_float(buffer, g_clients[i]->player->position.y);
+        buffer = serialize_float(buffer, g_clients[i]->player->angle);
+        buffer = serialize_float(buffer, g_clients[i]->player->speed);
+        buffer = serialize_float(buffer, g_clients[i]->player->acceleration);
+        buffer = serialize_int(buffer, &(g_clients[i]->player->laps));
+    }
+    buffer = serialize_int(buffer, &(game->track->field->ID));
+    buffer = serialize_string(buffer, game->track->field->name, FIELD_NAME_LEN);
+    buffer = serialize_int(buffer, &(game->track->field->Width));
+    buffer = serialize_int(buffer, &(game->track->field->Height));
+}
+
+void deserialize_msg_GI_response(
+    char *buffer, char *msg_type, game_t *game,
+    int *g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+) {
+    buffer = deserialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = deserialize_int(buffer, &(game->game_h->status));
+    buffer = deserialize_string(buffer, game->game_h->name, GAME_NAME_LEN);
+    buffer = deserialize_int(buffer, &(game->game_h->WinnerPlayerID));
+    buffer = deserialize_int(buffer, g_client_count);
+    // Deserialize each player info struct.
+    for(int i = 0; i < *g_client_count; i++) {
+        buffer = deserialize_int(buffer, &(g_clients[i]->player->ID));
+        buffer = deserialize_string(buffer, g_clients[i]->player->name, CLIENT_NAME_LEN);
+        buffer = deserialize_float(buffer, &(g_clients[i]->player->position.x));
+        buffer = deserialize_float(buffer, &(g_clients[i]->player->position.y));
+        buffer = deserialize_float(buffer, &(g_clients[i]->player->angle));
+        buffer = deserialize_float(buffer, &(g_clients[i]->player->speed));
+        buffer = deserialize_float(buffer, &(g_clients[i]->player->acceleration));
+        buffer = deserialize_int(buffer, &(g_clients[i]->player->laps));
+    }
+    buffer = deserialize_int(buffer, &(game->track->field->ID));
+    buffer = deserialize_string(buffer, game->track->field->name, FIELD_NAME_LEN);
+    buffer = deserialize_int(buffer, &(game->track->field->Width));
+    buffer = deserialize_int(buffer, &(game->track->field->Height));
+}
