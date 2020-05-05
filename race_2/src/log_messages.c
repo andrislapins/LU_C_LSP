@@ -80,7 +80,7 @@ void log_create_game_response(FILE *fp, client_t *client) {
     log_client_info(fp, client);
     fprintf(
         fp, 
-        "Created a game=%s(ID:%d) on field(ID:%d)\n",
+        "Created a game %s(ID:%d) on field(ID:%d)\n",
         client->game->game_h->name, client->game->ID, client->game->track->field->ID
     );
 }
@@ -131,6 +131,16 @@ void log_join_game_response(FILE *fp, client_t *client) {
         fp, 
         "Obtained ID - %d. Joined the game %s\n",
         client->player->ID, client->game->game_h->name
+    );
+}
+
+void log_msg_NOTIFY_sent(FILE *fp, char *msg_type, int pid, char *p_name, client_t *client) {
+    log_time_header(fp);
+    log_client_info(fp, client);
+    fprintf(
+        fp,
+        "Sent a notification(%s) to %s(ID:%d) about joining the game - %s\n",
+        msg_type, p_name, pid, client->game->game_h->name
     );
 }
 
@@ -457,11 +467,9 @@ void log_received_JG_msg(FILE *fp, char *msg_type, client_t *client) {
         ANSI_GREEN, ANSI_RESET_ALL,
         client->password
     );
-
-    print_array_in_hex("IN LOG", client->password, CLIENT_PASS_LEN);
 }
 
-void log_msg_NOTIFY(FILE *fp, char *msg_type, char *name, int new_p_id) {
+void log_msg_NOTIFY_received(FILE *fp, char *msg_type, int pid, char *name) {
     log_time_header(fp);
     fprintf(
         fp,
@@ -470,20 +478,14 @@ void log_msg_NOTIFY(FILE *fp, char *msg_type, char *name, int new_p_id) {
     );
     fprintf(
         fp,
-        "%sType%s: %s\n",
-        ANSI_GREEN, ANSI_RESET_ALL,
-        msg_type
+        "%sType(%s)%s ",
+        ANSI_GREEN, msg_type, ANSI_RESET_ALL
     );
     fprintf(
         fp,
-        "%sPlayer ID%s: %d\n",
-        ANSI_GREEN, ANSI_RESET_ALL,
-        new_p_id
-    );
-    fprintf(
-        fp,
-        "%sPlayer name%s: %s\n",
-        ANSI_GREEN, ANSI_RESET_ALL,
-        name
+        "%sPlayer %s%s%s(ID:%d) joined the game%s\n",
+        ANSI_GREEN, ANSI_YELLOW,
+        name, ANSI_GREEN,
+        pid, ANSI_RESET_ALL
     );
 }

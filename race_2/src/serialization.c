@@ -171,11 +171,18 @@ void serialize_msg_LI_response(char *buffer, int count_of_games, int **gid_arr) 
 void deserialize_msg_LI_response(char *buffer, char *msg_type, int *n_game_ids, int **gid_arr) {
     buffer = deserialize_string(buffer, msg_type , MSG_TYPE_LEN);
     buffer = deserialize_int(buffer, n_game_ids);
+
     // Deserialize each received game ID.
-    *gid_arr = malloc(*n_game_ids * sizeof(int));
-    for(int i = 0; i < *n_game_ids; i++) {
-        buffer = deserialize_int(buffer, gid_arr[i]);
+    int *innet_gid_arr = (int*)calloc(*n_game_ids, sizeof(int));
+    if (innet_gid_arr == NULL) {
+        printf("Mem alloc failed in deserialize_msg_LI_response!\n");
     }
+
+    for(int i = 0; i < *n_game_ids; i++) {
+        buffer = deserialize_int(buffer, &(innet_gid_arr[i]));
+    }
+
+    *gid_arr = innet_gid_arr;
 }
 
 /* msg GAME INFO serialization/deserialization */
@@ -280,7 +287,13 @@ void deserialize_msg_JG_response(char *buffer, char *msg_type, client_t *client)
 
 /* msg NOTIFY PLAYER JOINED serialization/deserialization */
 
-void deserialize_msg_NOTIFY(char *buffer, char *msg_type, char *name_buf, int *new_p_id) {
+void serialize_msg_NOTIFY(char *buffer, char *msg_type, int new_p_id, char *name_buf) {
+    buffer = serialize_string(buffer, msg_type, MSG_TYPE_LEN);
+    buffer = serialize_int(buffer, &(new_p_id));
+    buffer = serialize_string(buffer, name_buf, CLIENT_NAME_LEN);
+}
+
+void deserialize_msg_NOTIFY(char *buffer, char *msg_type, int *new_p_id, char *name_buf) {
     buffer = deserialize_string(buffer, msg_type, MSG_TYPE_LEN);
     buffer = deserialize_int(buffer, new_p_id);
     buffer = deserialize_string(buffer, name_buf, CLIENT_NAME_LEN);

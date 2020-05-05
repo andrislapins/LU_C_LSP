@@ -13,6 +13,8 @@
 // which would ONLY READ the first bytes (or a error msg) to detect
 // whether it should do [something].
 // -NOTE: Comment code thoroughly.
+// -NOTE: Almost all locks are located at the ends of functions. Maybe I can
+// narrow them down only for "write" calls.
 
 // Mutex initializer.
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -49,7 +51,7 @@ void init_game(game_t **game, int chosen_field_id);
 void init_tracks();
 
 void create_game_response(char *buffer, client_t *client) {
-    pthread_mutex_lock(&clients_mutex);
+    // pthread_mutex_lock(&clients_mutex);
     game_t  *game;
     char    *client_name, *game_name;
     int     chosen_field_id;
@@ -98,21 +100,21 @@ void create_game_response(char *buffer, client_t *client) {
 
     log_create_game_response(output, client);
 
-    pthread_mutex_unlock(&clients_mutex);
+    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void get_number_of_fields_response(char *buffer, client_t *client) {
-    pthread_mutex_lock(&clients_mutex);
+    // pthread_mutex_lock(&clients_mutex);
     // Set a response back to the client.
     memset(buffer, '\0', BUF_SIZE_WO_TYPE);
     serialize_msg_NF_response(buffer, track_count);
 
     log_get_number_of_fields_response(output, client);
-    pthread_mutex_unlock(&clients_mutex);
+    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void field_info_response(char *buffer, client_t *client) {
-    pthread_mutex_lock(&clients_mutex);
+    // pthread_mutex_lock(&clients_mutex);
     track_t *chosen_track;
     int chose;
 
@@ -129,11 +131,11 @@ void field_info_response(char *buffer, client_t *client) {
     serialize_msg_FI_response(buffer, chosen_track);
 
     log_field_info_response(output, client, chose);
-    pthread_mutex_unlock(&clients_mutex);
+    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void list_games_response(char *buffer, client_t *client) {
-    pthread_mutex_lock(&clients_mutex);
+    // pthread_mutex_lock(&clients_mutex);
     int     *gid_arr, ret;
     char    err_msg[ERR_MSG_LEN];
 
@@ -151,15 +153,15 @@ void list_games_response(char *buffer, client_t *client) {
     free(gid_arr);
 
     log_list_games_response(output, client);
-    pthread_mutex_unlock(&clients_mutex);
+    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void game_info_response(char *buffer, client_t *client) {
-    pthread_mutex_lock(&clients_mutex);
+    // pthread_mutex_lock(&clients_mutex);
     client_t *g_clients[MAX_CLIENTS_PER_GAME];
     client_node_t *current;
     game_t *chosen_game;
-    int chosen_gid, g_client_count;
+    int chosen_gid, g_client_count;  // b 164
 
     // Handling the message from a client.
     deserialize_msg_GI(buffer, &chosen_gid);
@@ -197,11 +199,11 @@ void game_info_response(char *buffer, client_t *client) {
     serialize_msg_GI_response(buffer, chosen_game, g_client_count, g_clients);
 
     log_game_info_response(output, client, chosen_gid);
-    pthread_mutex_unlock(&clients_mutex);
+    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void join_game_response(char *buffer, client_t *client) {
-    pthread_mutex_lock(&clients_mutex);
+    // pthread_mutex_lock(&clients_mutex);
     game_t *chosen_game;
     int chosen_game_id;
     char *client_name;
@@ -232,16 +234,55 @@ void join_game_response(char *buffer, client_t *client) {
     generate_password(output, client);
 
     // Set a response back to the client.
-    memset(buffer, 0, BUF_SIZE_WO_TYPE);
-    serialize_msg_CG_response(buffer, client);
+    memset(buffer, '\0', BUF_SIZE_WO_TYPE);
+    serialize_msg_JG_response(buffer, client);
 
     free(client_name);
 
-    // NOTE: Notify other players!!!!
-
     // Log the response.
     log_join_game_response(output, client);
-    pthread_mutex_unlock(&clients_mutex);
+    // pthread_mutex_unlock(&clients_mutex);
+
+    /* Notify other players */
+
+    char *buffer_notify;
+    char            msg_type[MSG_TYPE_LEN];
+    char            send_err_msg[ERR_MSG_LEN];
+    client_node_t   *current;
+    ssize_t         data_n;
+
+    current = clients_start;
+    strcpy(msg_type, "NF\0");
+    buffer_notify = malloc(MAX_BUFFER_SIZE);
+
+    while (current != NULL) {
+        memset(buffer_notify, '\0', MAX_BUFFER_SIZE);
+
+        // Sending this type of msg for the client himself.
+        if (current->client->player->ID == client->player->ID) {
+            current = current->next_client;
+            continue;
+        }
+
+        if (current->client->game->ID == chosen_game->ID) {
+            serialize_msg_NOTIFY(
+                buffer_notify, msg_type, client->player->ID, client->player->name
+            );
+
+            data_n = send(current->client->sock_fd, buffer_notify, MAX_BUFFER_SIZE, 0);
+            if (data_n < 0) {
+                sprintf(send_err_msg, "Could not send message of type %s!", msg_type);
+                err_die_server(output, send_err_msg);
+            }
+
+            log_msg_NOTIFY_sent(
+                output, msg_type, current->client->player->ID, 
+                current->client->player->name, client
+            );
+        }
+
+        current = current->next_client;
+    }
 }
 
 void handle_message(char *buffer, client_t *client) {
@@ -249,20 +290,37 @@ void handle_message(char *buffer, client_t *client) {
     char err_msg[ERR_MSG_LEN];
 
     buffer = buffer + 3; // Pass the point of buffer after msg_type.
-    log_recvd_msg_type(output, client, msg_type);
+    // log_recvd_msg_type(output, client, msg_type);
 
-    if (strcmp(msg_type, "CG") == 0) {
+    if (strcmp(msg_type, "CG") == 0) { // CREATE GAME
+        log_recvd_msg_type(output, client, msg_type);
+
         create_game_response(buffer, client);
-    } else if (strcmp(msg_type, "NF") == 0) {
+    } else if (strcmp(msg_type, "NF") == 0) { // GET NUMBER OF FIELDS
+        log_recvd_msg_type(output, client, msg_type);
+
         get_number_of_fields_response(buffer, client);
-    } else if (strcmp(msg_type, "FI") == 0) {
+    } else if (strcmp(msg_type, "FI") == 0) { // FIELD INFO
+        log_recvd_msg_type(output, client, msg_type);
+
         field_info_response(buffer, client);
-    } else if (strcmp(msg_type, "LI") == 0) {
+    } else if (strcmp(msg_type, "LI") == 0) { // LIST GAMES
+        log_recvd_msg_type(output, client, msg_type);
+
         list_games_response(buffer, client);
-    } else if (strcmp(msg_type, "GI") == 0) {
+    } else if (strcmp(msg_type, "GI") == 0) { // GAME INFO
+        log_recvd_msg_type(output, client, msg_type);
+
         game_info_response(buffer, client);
-    } else if (strcmp(msg_type, "JG") == 0) {
+    } else if (strcmp(msg_type, "JG") == 0) { // JOIN GAME
+        log_recvd_msg_type(output, client, msg_type);
+
         join_game_response(buffer, client);
+    } else if (strcmp(msg_type, "PI") == 0) { // PING PONG
+        buffer = buffer - 3;
+        buffer[0] = 'P';
+        buffer[1] = 'O';
+        buffer[2] = '\0';
     } else {
         // NOTE: Have a function - print_log AND send_err_msg() in one func.
         sprintf(err_msg, "Received an unknown type - %s", msg_type);
@@ -325,7 +383,7 @@ void *handle_client(void *arg) {
     }
 
     client_count--;
-    
+
     // End thread instantlly.
     pthread_detach(pthread_self());
 
@@ -394,7 +452,10 @@ int main(int argc, char **argv) {
 
     // === Server/Game has started === //
 
-    fprintf(output, "%sServer is on...%s\n", ANSI_BLINK, ANSI_RESET_ALL);
+    fprintf(
+        output, "%s%sServer is on...%s\n", 
+        ANSI_GREEN, ANSI_BLINK, ANSI_RESET_ALL
+    );
 
     // Initialize all tracks.
     init_tracks(&track);
@@ -474,7 +535,7 @@ FILE *change_log_output(FILE *fp, char *path) {
 }
 
 void init_client(client_t **client, int client_sock) {
-    pthread_mutex_lock(&clients_mutex);
+    // pthread_mutex_lock(&clients_mutex);
     // Client struct allocation.
     *client = malloc(sizeof(client_t));
     if (*client == NULL) {
@@ -530,7 +591,7 @@ void init_client(client_t **client, int client_sock) {
     // Save this client in the global clients list.
     push_client(&clients_start, client);
 
-    pthread_mutex_unlock(&clients_mutex);
+    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void init_game(game_t **game, int chosen_field_id) {

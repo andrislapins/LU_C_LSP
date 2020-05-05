@@ -45,8 +45,9 @@
 
 #define ANSI_RED        "\e[31m"
 #define ANSI_GREEN      "\e[32m"
+#define ANSI_LGREEN     "\e[92m"
 #define ANSI_YELLOW     "\e[93m"
-#define ANSI_HACK        "\e[40;38;5;82m"
+#define ANSI_HACK       "\e[40;38;5;82m"
 
 // NOTE:? Could I typdef(verb) all protocol structs and safely use/manage them.
 

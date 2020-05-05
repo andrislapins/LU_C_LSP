@@ -22,7 +22,7 @@ void log_field_info_response(FILE *fp, client_t *client, int chosen_field_id);
 void log_list_games_response(FILE *fp, client_t *client);
 void log_game_info_response(FILE *fp, client_t *client, int chosen_game_id);
 void log_join_game_response(FILE *fp, client_t *client);
-
+void log_msg_NOTIFY_sent(FILE *fp, char *msg_type, int new_p_id, char *name, client_t *client);
 
 void log_received_CG_msg(FILE *fp,char *msg_type, client_t *client);
 void log_received_FI_msg(FILE *fp,char *msg_type, client_t *client);
@@ -32,6 +32,6 @@ void log_received_GI_msg(
     int g_client_count, struct Player_info ***p
 );
 void log_received_JG_msg(FILE *fp,char *msg_type, client_t *client);
-void log_msg_NOTIFY(FILE *fp, char *msg_type, char *name, int new_p_id);
+void log_msg_NOTIFY_received(FILE *fp, char *msg_type, int new_p_id, char *name);
 
 #endif

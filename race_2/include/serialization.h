@@ -56,6 +56,7 @@ void deserialize_msg_JG(char *buffer, int *game_id, char *client_name);
 void serialize_msg_JG_response(char *buffer, client_t *client);
 void deserialize_msg_JG_response(char *buffer, char *msg_type, client_t *client);
 
-void deserialize_msg_NOTIFY(char *buffer, char *msg_type, char *name_buf, int *new_p_id);
+void serialize_msg_NOTIFY(char *buffer, char *msg_type, int new_p_id, char *name_buf);
+void deserialize_msg_NOTIFY(char *buffer, char *msg_type, int *new_p_id, char *name_buf);
 
 #endif

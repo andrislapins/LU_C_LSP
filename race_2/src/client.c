@@ -71,8 +71,6 @@ void join_game(char *buffer, client_t *client, int game_id) {
 
     /* Serialize the data */
 
-    memset(msg_type, '\0', MSG_TYPE_LEN); // NOTE: Does this fix password error.
-
     memset(buffer, '\0', MAX_BUFFER_SIZE);
     serialize_msg_JG(buffer, msg_type, game_id, client->player->name);
 
@@ -82,6 +80,33 @@ void join_game(char *buffer, client_t *client, int game_id) {
 
     // Log the response.
     log_received_JG_msg(output, msg_type, client);
+
+    /* Get notified about new players */
+
+    // NOTE: Sit in a while loop and get notified about new players joining (max 4) 
+    // until want to proceess to send a START GAME request.
+    int     pid;
+
+    while (1) {
+        memset(buffer,   '\0', MAX_BUFFER_SIZE);
+        memset(msg_type, '\0', MSG_TYPE_LEN);
+        memset(name_buf, '\0', MSG_BUF_LEN);
+
+        // printf("in join\n");
+        buffer[0] = 'P';
+        buffer[1] = 'I';
+        buffer[2] = '\0';
+
+        send_n_recv(buffer, msg_type, client->sock_fd);
+
+        deserialize_msg_NOTIFY(buffer, msg_type, &pid, name_buf);
+
+        if (strlen(name_buf) != 0) {
+            log_msg_NOTIFY_received(output, msg_type, pid, name_buf);
+        }
+
+        sleep(1);
+    }
 
     free(name_buf);
 }
@@ -110,7 +135,7 @@ int list_games(char *buffer, client_t *client) {
 
     send_n_recv(buffer, msg_type, client->sock_fd);
 
-    deserialize_msg_LI_response(buffer, msg_type, &(n_games), &gid_arr);
+    deserialize_msg_LI_response(buffer, msg_type, &n_games, &gid_arr);
 
     // Log the response.
     log_received_LI_msg(output, msg_type, n_games, gid_arr);
@@ -148,7 +173,7 @@ int list_games(char *buffer, client_t *client) {
         err_die_client(output, "There is no such game ID!");
     }
 
-    client->game->ID = chose; // bug unitialised !!!
+    client->game->ID = chose;
 
     // Reinitialize the buffer for data serialization.
     memset(buffer, '\0', MAX_BUFFER_SIZE);
@@ -181,9 +206,6 @@ int get_number_of_fields(char* buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN];
     char num_str[DIGITS_LEN];
     int  n_field_ids, chose;
-    // For allocating game and track memory for client.
-    // game_t *game;
-    // track_t *track;
 
     /* GET_NUMBER_OF_FIELDS */
 
@@ -289,10 +311,7 @@ void create_game(char *buffer, client_t *client, int field_id) {
     /* Serialize the data */
 
     memset(buffer, '\0', MAX_BUFFER_SIZE);
-    serialize_msg_CG(
-        buffer, msg_type, client->player->name, 
-        client->game->game_h->name, field_id
-    );
+    serialize_msg_CG(buffer, msg_type, client->player->name, client->game->game_h->name, field_id);
 
     send_n_recv(buffer, msg_type, client->sock_fd);
 
@@ -305,23 +324,33 @@ void create_game(char *buffer, client_t *client, int field_id) {
 
     // NOTE: Sit in a while loop and get notified about new players joining (max 4) 
     // until want to proceess to send a START GAME request.
-    ssize_t data_n, new_p_id;
-    char    recv_err_msg[ERR_MSG_LEN];
+    int     pid;
+
+    printf(
+        "%s%sWaiting for other player to join...%s\n", 
+        ANSI_LGREEN, ANSI_BLINK, ANSI_RESET_ALL
+    );
 
     while (1) {
-        memset(buffer, '\0', MAX_BUFFER_SIZE);
+        memset(buffer,   '\0', MAX_BUFFER_SIZE);
         memset(msg_type, '\0', MSG_TYPE_LEN);
         memset(name_buf, '\0', MSG_BUF_LEN);
 
-        data_n = recv(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
-        if (data_n < 0) {
-            sprintf(recv_err_msg, "Could not receive message of type %s!", msg_type);
-            err_die_client(output, recv_err_msg);
+        // printf("in create?\n");
+
+        buffer[0] = 'P';
+        buffer[1] = 'I';
+        buffer[2] = '\0';
+
+        send_n_recv(buffer, msg_type, client->sock_fd);
+
+        deserialize_msg_NOTIFY(buffer, msg_type, &pid, name_buf);
+
+        if (strlen(name_buf) != 0) {
+            log_msg_NOTIFY_received(output, msg_type, pid, name_buf);
         }
 
-        deserialize_msg_NOTIFY(buffer, msg_type, name_buf, &new_p_id);
-
-        log_msg_NOTIFY(output, msg_type, name_buf, new_p_id);
+        sleep(1);
     }
 
     free(name_buf);
@@ -376,7 +405,7 @@ int main(int argc, char **argv) {
 
     // === Client/Game has started ===
 
-    printf("Welcome to the best race game EVER!\n");
+    printf("%sWelcome to the best race game EVER!%s\n", ANSI_GREEN, ANSI_RESET_ALL);
 
     // Allocate and initialize the buffer.
     buffer = malloc(MAX_BUFFER_SIZE);
