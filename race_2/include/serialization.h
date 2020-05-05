@@ -59,4 +59,15 @@ void deserialize_msg_JG_response(char *buffer, char *msg_type, client_t *client)
 void serialize_msg_NOTIFY(char *buffer, char *msg_type, int new_p_id, char *name_buf);
 void deserialize_msg_NOTIFY(char *buffer, char *msg_type, int *new_p_id, char *name_buf);
 
+void serialize_msg_SG(char *buffer, char *msg_type, client_t *client);
+void deserialize_msg_SG(char *buffer, int *game_id, char *password);
+void serialize_msg_SG_response(
+    char *buffer, char *msg_type, int client_count,
+    client_t *g_clients[MAX_CLIENTS_PER_GAME], game_t *game
+);
+void deserialize_msg_SG_response(
+    char *buffer, char *msg_type, int *client_count, game_t *game,
+    struct Player_info ***other_pi_arr_of_p
+);
+
 #endif

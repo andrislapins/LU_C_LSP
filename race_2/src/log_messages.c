@@ -469,7 +469,7 @@ void log_received_JG_msg(FILE *fp, char *msg_type, client_t *client) {
     );
 }
 
-void log_msg_NOTIFY_received(FILE *fp, char *msg_type, int pid, char *name) {
+void log_msg_NOTIFY_received(FILE *fp, int pid, char *name) {
     log_time_header(fp);
     fprintf(
         fp,
@@ -478,14 +478,172 @@ void log_msg_NOTIFY_received(FILE *fp, char *msg_type, int pid, char *name) {
     );
     fprintf(
         fp,
-        "%sType(%s)%s ",
-        ANSI_GREEN, msg_type, ANSI_RESET_ALL
-    );
-    fprintf(
-        fp,
         "%sPlayer %s%s%s(ID:%d) joined the game%s\n",
         ANSI_GREEN, ANSI_YELLOW,
         name, ANSI_GREEN,
         pid, ANSI_RESET_ALL
+    );
+}
+
+void log_received_SG_msg(
+    FILE *fp, char *msg_type, game_t *game,
+    int g_client_count, struct Player_info ***p
+) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "%sReceived%s:\n",
+        ANSI_YELLOW, ANSI_RESET_ALL
+    );
+    fprintf(
+        fp,
+        "%sType%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        msg_type
+    );
+
+    // Displaying game header info.
+    fprintf(
+        fp,
+        "%sGame status%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->game_h->status
+    );
+    fprintf(
+        fp,
+        "%sGame name%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->game_h->name
+    );
+    fprintf(
+        fp,
+        "%sGame winner ID%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->game_h->WinnerPlayerID
+    );
+    fprintf(
+        fp,
+        "%sPlayer count%s: %d\n\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        g_client_count
+    );
+
+    // Displaying player info one by one.
+    for(int i = 0; i < g_client_count; i++) {
+        fprintf(
+            fp,
+            "%sPlayer ID%s: %d\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->ID
+        );
+        fprintf(
+            fp,
+            "%sPlayer Name%s: %s%s%s\n",
+            ANSI_GREEN, ANSI_RESET_ALL, ANSI_YELLOW,
+            (*p)[i]->name,
+            ANSI_YELLOW
+        );
+        fprintf(
+            fp,
+            "%sPlayer positon%s x: %f, y: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->position.x, (*p)[i]->position.y
+        );
+        fprintf(
+            fp,
+            "%sPlayer angle%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->angle
+        );
+        fprintf(
+            fp,
+            "%sPlayer speed%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->speed
+        );
+        fprintf(
+            fp,
+            "%sPlayer acceleration%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->acceleration
+        );
+        fprintf(
+            fp,
+            "%sPlayer laps%s: %d\n\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->laps
+        );
+    }
+
+    // Displaying info about the field.
+    fprintf(
+        fp,
+        "%sField ID%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->track->field->ID
+    );
+    fprintf(
+        fp,
+        "%sField name%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->track->field->name
+    );
+    fprintf(
+        fp,
+        "%sField width%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->track->field->Width
+    );
+    fprintf(
+        fp,
+        "%sField heigth%s: %d\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->track->field->Height
+    );
+    fprintf(
+        fp, 
+        "%sStart line beggining%s x: %f, y: %f\n",
+        ANSI_GREEN, ANSI_RESET_ALL, 
+        game->track->start_line->beggining.x, 
+        game->track->start_line->beggining.y
+    );
+    fprintf(
+        fp, 
+        "%sStart line end%s x: %f, y: %f\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->track->start_line->end.x, 
+        game->track->start_line->end.y
+    );
+    fprintf(
+        fp, 
+        "%sMain line beggining%s x: %f, y: %f\n", 
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->track->main_line->beggining.x, 
+        game->track->main_line->beggining.y
+    );
+    fprintf(
+        fp, 
+        "%sMain line end%s x: %f, y: %f\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->track->main_line->end.x, 
+        game->track->main_line->end.y
+    );
+    fprintf(
+        fp, 
+        "%sNumber of extra lines%s: %d\n", 
+        ANSI_GREEN, ANSI_RESET_ALL,
+        game->track->n_extra_lines
+    );
+}
+
+void log_msg_SG_sent(
+    FILE *fp, char *msg_type, int pid, char *p_name, client_t *client
+) {
+    log_time_header(fp);
+    log_client_info(fp, client);
+    fprintf(
+        fp, 
+        "Sent %s message to %s(ID:%d) of game %s\n",
+        msg_type, p_name, pid, client->game->game_h->name
     );
 }

@@ -298,3 +298,96 @@ void deserialize_msg_NOTIFY(char *buffer, char *msg_type, int *new_p_id, char *n
     buffer = deserialize_int(buffer, new_p_id);
     buffer = deserialize_string(buffer, name_buf, CLIENT_NAME_LEN);
 }
+
+/* msg START GAME serialization/deserialization */
+
+void serialize_msg_SG(char *buffer, char *msg_type, client_t *client) {
+    buffer = serialize_string(buffer, msg_type, MSG_TYPE_LEN);
+    buffer = serialize_int(buffer, &(client->game->ID));
+    buffer = serialize_string(buffer, client->password, CLIENT_PASS_LEN);
+}
+
+void deserialize_msg_SG(char *buffer, int *game_id, char *password) {
+    buffer = deserialize_int(buffer, game_id);
+    buffer = deserialize_string(buffer, password, CLIENT_PASS_LEN);
+}
+
+void serialize_msg_SG_response(
+    char *buffer, char *msg_type, int client_count,
+    client_t *g_clients[MAX_CLIENTS_PER_GAME], game_t *game
+) {
+    buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = serialize_int(buffer, &(client_count));
+
+     // Serialize each player info struct.
+    for(int i = 0; i < client_count; i++) {
+        buffer = serialize_int(buffer, &(g_clients[i]->player->ID));
+        buffer = serialize_string(buffer, g_clients[i]->player->name, CLIENT_NAME_LEN);
+        buffer = serialize_float(buffer, g_clients[i]->player->position.x);
+        buffer = serialize_float(buffer, g_clients[i]->player->position.y);
+        buffer = serialize_float(buffer, g_clients[i]->player->angle);
+        buffer = serialize_float(buffer, g_clients[i]->player->speed);
+        buffer = serialize_float(buffer, g_clients[i]->player->acceleration);
+        buffer = serialize_int(buffer, &(g_clients[i]->player->laps));
+    }
+
+    buffer = serialize_int(buffer, &(game->track->field->ID));
+    buffer = serialize_string(buffer, game->track->field->name, FIELD_NAME_LEN);
+    buffer = serialize_int(buffer, &(game->track->field->Width));
+    buffer = serialize_int(buffer, &(game->track->field->Height));
+
+    buffer = serialize_float(buffer, game->track->start_line->beggining.x);
+    buffer = serialize_float(buffer, game->track->start_line->beggining.y);
+    buffer = serialize_float(buffer, game->track->start_line->end.x);
+    buffer = serialize_float(buffer, game->track->start_line->end.y);
+    buffer = serialize_float(buffer, game->track->main_line->beggining.x);
+    buffer = serialize_float(buffer, game->track->main_line->beggining.y);
+    buffer = serialize_float(buffer, game->track->main_line->end.x);
+    buffer = serialize_float(buffer, game->track->main_line->end.y);
+    buffer = serialize_int(buffer, &(game->track->n_extra_lines));
+}
+
+void deserialize_msg_SG_response(
+    char *buffer, char *msg_type, int *client_count, game_t *game,
+    struct Player_info ***other_pi_arr_of_p
+) {
+    struct Player_info **pi_arr_of_p;
+
+    buffer = deserialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = deserialize_int(buffer, client_count);
+
+    // Create an array of PI pointers.
+    pi_arr_of_p = malloc(*client_count * sizeof(struct Player_info));
+
+     // Deserialize each player info struct.
+    for(int i = 0; i < *client_count; i++) {
+        pi_arr_of_p[i] = malloc(sizeof(struct Player_info));
+        
+        buffer = deserialize_int(buffer, &(pi_arr_of_p[i]->ID));
+        buffer = deserialize_string(buffer, pi_arr_of_p[i]->name, CLIENT_NAME_LEN);
+        buffer = deserialize_float(buffer, &(pi_arr_of_p[i]->position.x));
+        buffer = deserialize_float(buffer, &(pi_arr_of_p[i]->position.y));
+        buffer = deserialize_float(buffer, &(pi_arr_of_p[i]->angle));
+        buffer = deserialize_float(buffer, &(pi_arr_of_p[i]->speed));
+        buffer = deserialize_float(buffer, &(pi_arr_of_p[i]->acceleration));
+        buffer = deserialize_int(buffer, &(pi_arr_of_p[i]->laps));
+    }
+
+    buffer = deserialize_int(buffer, &(game->track->field->ID));
+    buffer = deserialize_string(buffer, game->track->field->name, FIELD_NAME_LEN);
+    buffer = deserialize_int(buffer, &(game->track->field->Width));
+    buffer = deserialize_int(buffer, &(game->track->field->Height));
+
+    buffer = deserialize_float(buffer, &(game->track->start_line->beggining.x));
+    buffer = deserialize_float(buffer, &(game->track->start_line->beggining.y));
+    buffer = deserialize_float(buffer, &(game->track->start_line->end.x));
+    buffer = deserialize_float(buffer, &(game->track->start_line->end.y));
+    buffer = deserialize_float(buffer, &(game->track->main_line->beggining.x));
+    buffer = deserialize_float(buffer, &(game->track->main_line->beggining.y));
+    buffer = deserialize_float(buffer, &(game->track->main_line->end.x));
+    buffer = deserialize_float(buffer, &(game->track->main_line->end.y));
+    buffer = deserialize_int(buffer, &(game->track->n_extra_lines));
+
+    // Assign the pointer back to the calling function.
+    *other_pi_arr_of_p = pi_arr_of_p;
+}

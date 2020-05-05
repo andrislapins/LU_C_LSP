@@ -5,7 +5,7 @@ ODIR=obj
 
 CC=gcc
 CFLAGS=-g -Wall -Werror -I$(IDIR)
-LFLAGS=-lpthread
+LFLAGS=-lpthread -lncurses
 
 HEAD=$(IDIR)/protocol.h $(IDIR)/common.h $(IDIR)/serialization.h \
 			$(IDIR)/linked_list.h $(IDIR)/log_messages.h
@@ -40,7 +40,7 @@ $(ODIR)/server.o: server.c $(HEAD)
 # Client/Server executables.
 
 client.exe: $(ODIR)/client.o $(OTHER_OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LFLAGS)
 
 server.exe: $(ODIR)/server.o $(OTHER_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LFLAGS)

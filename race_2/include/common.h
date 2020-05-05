@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <time.h>
 #include <getopt.h>
+#include <ncurses.h>
 #include <sys/types.h> // pthread_mutex_t, pthread_cond_t etc.
 #include <sys/socket.h>
 #include <netinet/in.h> // struct in_addr, sin_family, AF_INET etc.

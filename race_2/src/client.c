@@ -13,7 +13,6 @@
 
 // LLs and variables of the main game types.
 client_node_t *clients_start = NULL;
-// int client_count = 0;
 game_node_t *games_start     = NULL;
 track_node_t *tracks_start   = NULL;
 
@@ -24,6 +23,15 @@ char *buffer;
 FILE *output;
 char *ip;
 int  port;
+
+// Variables w/ whom to manage starting a game pressing CTRL+C.
+int control_c_safe = 0;
+int start_game_sig = 0;
+
+// struct Player_info **SG; // To assign values inside 
+// // deseriaization func.
+struct Player_info ***SG_pi_others; // Assign address of other_pi_arr_of_p for
+// easier pointer management/iteration.
 
 // Helper function prototypes.
 void handle_sigint(int sig);
@@ -37,6 +45,11 @@ void init_game(game_t **game);
 void init_tracks();
 
 /* The main functions for communication */
+
+void start_game(char *buffer, client_t *client) {
+    printf("\nGame started!\n");
+    //...
+}
 
 void join_game(char *buffer, client_t *client, int game_id) {
     char    msg_type[MSG_TYPE_LEN];
@@ -87,22 +100,53 @@ void join_game(char *buffer, client_t *client, int game_id) {
     // until want to proceess to send a START GAME request.
     int     pid;
 
+    // NOTE: Should store these values globally.
+    int client_count;
+    struct Player_info **other_pi_arr_of_p; // To assign values inside 
+    // deseriaization func.
+    struct Player_info ***p; // Assign address of other_pi_arr_of_p for
+    // easier pointer management/iteration.
+    // game_t *game;
+
+    // receive notif about yourself?
+
     while (1) {
         memset(buffer,   '\0', MAX_BUFFER_SIZE);
         memset(msg_type, '\0', MSG_TYPE_LEN);
         memset(name_buf, '\0', MSG_BUF_LEN);
 
-        // printf("in join\n");
-        buffer[0] = 'P';
-        buffer[1] = 'I';
-        buffer[2] = '\0';
+        strcpy(msg_type, "PI\0"); // NOTE: Sending PING PONG msg type resolves
+        // recv/send functions blocking the program, for now.
+        strcat(buffer, msg_type);
 
         send_n_recv(buffer, msg_type, client->sock_fd);
+
+        if (buffer[0] == 'S' && buffer[1] == 'G') {
+            // memset(buffer, '\0', MAX_BUFFER_SIZE);
+            // serialize_msg_SG(buffer, msg_type, client);
+
+            // send_n_recv(buffer, msg_type, client->sock_fd);
+
+            deserialize_msg_SG_response(
+                buffer, msg_type, &client_count, client->game,
+                &other_pi_arr_of_p
+            );
+
+            // Assign to more readable pointer.
+            p = &other_pi_arr_of_p;
+
+            // Log the response.
+            log_received_SG_msg(
+                output, msg_type, client->game, client_count, p
+            );
+
+            break;
+        }
 
         deserialize_msg_NOTIFY(buffer, msg_type, &pid, name_buf);
 
         if (strlen(name_buf) != 0) {
-            log_msg_NOTIFY_received(output, msg_type, pid, name_buf);
+            log_msg_NOTIFY_received(output, pid, name_buf);
         }
 
         sleep(1);
@@ -202,6 +246,7 @@ int list_games(char *buffer, client_t *client) {
     return chose;
 }
 
+// get_number_of_fields returns the chosen field ID from which to create a game.
 int get_number_of_fields(char* buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN];
     char num_str[DIGITS_LEN];
@@ -320,34 +365,73 @@ void create_game(char *buffer, client_t *client, int field_id) {
     // Log the response.
     log_received_CG_msg(output, msg_type, client);
 
-    /* Get notified about new players */
+    /* Get notified about new players AND wait until START GAME */
 
     // NOTE: Sit in a while loop and get notified about new players joining (max 4) 
     // until want to proceess to send a START GAME request.
     int     pid;
+    int     p_count = 1;
+
+    // NOTE: Should store these values globally.
+    int client_count;
+    struct Player_info **other_pi_arr_of_p; // To assign values inside 
+    // deseriaization func.
+    struct Player_info ***p; // Assign address of other_pi_arr_of_p for
+    // easier pointer management/iteration.
+    // game_t *game;
 
     printf(
-        "%s%sWaiting for other player to join...%s\n", 
+        "%s%sWaiting for other players to join...%s\n", 
         ANSI_LGREEN, ANSI_BLINK, ANSI_RESET_ALL
     );
+    printf("Press CTRL+C to start the game\n");
+    control_c_safe = 1;
 
     while (1) {
         memset(buffer,   '\0', MAX_BUFFER_SIZE);
         memset(msg_type, '\0', MSG_TYPE_LEN);
         memset(name_buf, '\0', MSG_BUF_LEN);
 
-        // printf("in create?\n");
-
-        buffer[0] = 'P';
-        buffer[1] = 'I';
-        buffer[2] = '\0';
+        strcpy(msg_type, "PI\0"); // NOTE: Sending PING PONG msg type resolves
+        // recv/send functions to block the program, for now.
+        strcat(buffer, msg_type);
 
         send_n_recv(buffer, msg_type, client->sock_fd);
 
         deserialize_msg_NOTIFY(buffer, msg_type, &pid, name_buf);
 
+        // If a joined player name has been parsed.
         if (strlen(name_buf) != 0) {
-            log_msg_NOTIFY_received(output, msg_type, pid, name_buf);
+            log_msg_NOTIFY_received(output, pid, name_buf);
+            p_count++;
+        }
+
+        // In order to start the game.
+        if ((p_count == 4 || start_game_sig == 1)) {
+            memset(buffer, '\0', MAX_BUFFER_SIZE);
+            strcpy(msg_type, "SG\0");
+            serialize_msg_SG(buffer, msg_type, client);
+
+            do {
+                send_n_recv(buffer, msg_type, client->sock_fd);
+                printf("loop\n");
+                sleep(1);
+            } while (!(buffer[0] == 'S' && buffer[1] == 'G'));
+
+            deserialize_msg_SG_response(
+                buffer, msg_type, &client_count, client->game,
+                &other_pi_arr_of_p
+            );
+
+            // Assign to more readable pointer.
+            p = &other_pi_arr_of_p;
+
+            // Log the response.
+            log_received_SG_msg(
+                output, msg_type, client->game, client_count, p
+            );
+
+            break;
         }
 
         sleep(1);
@@ -454,6 +538,8 @@ int main(int argc, char **argv) {
         err_die_client(output, "The answer is invalid!");
     }
 
+    start_game(buffer, client);
+
     /* Exit program gracefully */
 
     printf("Press ENTER to exit...");
@@ -473,6 +559,13 @@ int main(int argc, char **argv) {
 /* === Helper functions === */
 
 void handle_sigint(int sig) {
+    if (control_c_safe == 1) {
+        start_game_sig = 1;
+        control_c_safe = 0;
+
+        return;
+    }
+
     char err_msg[ERR_MSG_LEN];
 
     memset(err_msg, 0, ERR_MSG_LEN);
@@ -480,7 +573,6 @@ void handle_sigint(int sig) {
     
     err_die_client(output, err_msg);
 }
-
 
 void err_die_client(FILE *fp, char* err_msg) {
     // General message handling.

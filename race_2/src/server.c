@@ -13,8 +13,6 @@
 // which would ONLY READ the first bytes (or a error msg) to detect
 // whether it should do [something].
 // -NOTE: Comment code thoroughly.
-// -NOTE: Almost all locks are located at the ends of functions. Maybe I can
-// narrow them down only for "write" calls.
 
 // Mutex initializer.
 pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -50,8 +48,96 @@ void init_client(client_t **client, int client_sock);
 void init_game(game_t **game, int chosen_field_id);
 void init_tracks();
 
+// start_game_response send info about the started game to every client of the game.
+void start_game_response(char *buffer, client_t *client) {
+    client_t        *g_clients[MAX_CLIENTS_PER_GAME];
+    // char            *buffer_SG;
+    char            msg_type[MSG_TYPE_LEN];
+    char            send_err_msg[ERR_MSG_LEN];
+    char            *password;
+    client_node_t   *other, *current;
+    ssize_t         data_n;
+    int             game_id;
+    int             g_client_count;
+
+    // Program terminated with signal SIGSEGV, Segmentation fault.
+    // #0  0x00007f9158e497e4 in ?? ()
+    // after receiving SG got segfault
+
+    password = malloc(CLIENT_PASS_LEN);
+    if (password == NULL) {
+        err_die_server(output, "Could not allocate memory for password when starting game!");
+    }
+
+    memset(password, '\0', CLIENT_PASS_LEN);
+
+    deserialize_msg_SG(buffer, &game_id, password);
+
+    if (strcmp(client->password, password) != 0) {
+        err_die_server(output, "Received incorrect client password!");
+    }
+
+    strcpy(msg_type, "SG\0");
+
+    // Collect the players (client_t) of the chosen game.
+    current = clients_start;
+    g_client_count = 0;
+
+    // OPTION: compare on adding "|| g_client_count < MAX_CLIENTS_PER_GAME".
+    for(int i = 0; current != NULL; i++) {
+        if(current->client->game->ID == game_id) {
+            g_clients[g_client_count] = current->client;
+            g_client_count++;
+        }
+
+        current = current->next_client;
+    }
+
+    // Initialize the values to create the SG msg.
+
+    other = clients_start; // "Other client".
+
+    // buffer_SG = malloc(MAX_BUFFER_SIZE);
+    // if (buffer_SG == NULL) {
+    //     err_die_server(output, "Could not allocate memory for buffer when starting game!");
+    // }
+
+    // Start from the begging (overwriting msg type too).
+    buffer = buffer - 3;
+
+    memset(buffer, '\0', MAX_BUFFER_SIZE);
+
+    // Create the SG msg to send all the clients of the game.
+    serialize_msg_SG_response(
+        buffer, msg_type, g_client_count, g_clients, client->game
+    );
+    
+    while (other != NULL) {
+        // Do NOT send this type of msg for the client himself.
+        if (other->client->player->ID == client->player->ID) {
+            other = other->next_client;
+            continue;
+        }
+
+        if (other->client->game->ID == client->game->ID) {
+            data_n = send(other->client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
+            if (data_n < 0) {
+                sprintf(send_err_msg, "Could not send message of type %s!", msg_type);
+                err_die_server(output, send_err_msg);
+            }
+
+            log_msg_SG_sent(output, msg_type, other->client->player->ID, 
+                other->client->player->name, client
+            );
+        }
+
+        other = other->next_client;
+    }
+
+    free(password);
+}
+
 void create_game_response(char *buffer, client_t *client) {
-    // pthread_mutex_lock(&clients_mutex);
     game_t  *game;
     char    *client_name, *game_name;
     int     chosen_field_id;
@@ -82,11 +168,19 @@ void create_game_response(char *buffer, client_t *client) {
 
     // CHECK and FREE the dummy game and only then assign the new game 
     // for the client. NOTE: Should I allow a client create two games?
+    pthread_mutex_lock(&clients_mutex);
+
     if (client->game->ID == 0) {
         free(client->game);
     }
     
     client->game = game;
+
+    pthread_mutex_unlock(&clients_mutex);
+
+    free(client_name);
+    free(game_name);
+
 
     // Create a password for the client.
     generate_password(output, client);
@@ -95,26 +189,18 @@ void create_game_response(char *buffer, client_t *client) {
     memset(buffer, 0, BUF_SIZE_WO_TYPE);
     serialize_msg_CG_response(buffer, client);
 
-    free(client_name);
-    free(game_name);
-
     log_create_game_response(output, client);
-
-    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void get_number_of_fields_response(char *buffer, client_t *client) {
-    // pthread_mutex_lock(&clients_mutex);
     // Set a response back to the client.
     memset(buffer, '\0', BUF_SIZE_WO_TYPE);
     serialize_msg_NF_response(buffer, track_count);
 
     log_get_number_of_fields_response(output, client);
-    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void field_info_response(char *buffer, client_t *client) {
-    // pthread_mutex_lock(&clients_mutex);
     track_t *chosen_track;
     int chose;
 
@@ -131,11 +217,9 @@ void field_info_response(char *buffer, client_t *client) {
     serialize_msg_FI_response(buffer, chosen_track);
 
     log_field_info_response(output, client, chose);
-    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void list_games_response(char *buffer, client_t *client) {
-    // pthread_mutex_lock(&clients_mutex);
     int     *gid_arr, ret;
     char    err_msg[ERR_MSG_LEN];
 
@@ -153,15 +237,13 @@ void list_games_response(char *buffer, client_t *client) {
     free(gid_arr);
 
     log_list_games_response(output, client);
-    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void game_info_response(char *buffer, client_t *client) {
-    // pthread_mutex_lock(&clients_mutex);
     client_t *g_clients[MAX_CLIENTS_PER_GAME];
     client_node_t *current;
     game_t *chosen_game;
-    int chosen_gid, g_client_count;  // b 164
+    int chosen_gid, g_client_count;
 
     // Handling the message from a client.
     deserialize_msg_GI(buffer, &chosen_gid);
@@ -188,25 +270,31 @@ void game_info_response(char *buffer, client_t *client) {
 
     // CHECK and FREE the dummy game and only then assign the new game 
     // for the client. NOTE: Should I allow a client create two games?
+    pthread_mutex_lock(&clients_mutex);
+
     if (client->game->ID == 0) {
         free(client->game);
     }
     
     client->game = chosen_game;
 
+    pthread_mutex_unlock(&clients_mutex);
+
     // Set a response back to the client.
     memset(buffer, '\0', BUF_SIZE_WO_TYPE);
     serialize_msg_GI_response(buffer, chosen_game, g_client_count, g_clients);
 
     log_game_info_response(output, client, chosen_gid);
-    // pthread_mutex_unlock(&clients_mutex);
 }
 
 void join_game_response(char *buffer, client_t *client) {
-    // pthread_mutex_lock(&clients_mutex);
-    game_t *chosen_game;
-    int chosen_game_id;
-    char *client_name;
+    game_t      *chosen_game;
+    int         chosen_game_id;
+    char        *client_name;
+    ssize_t     data_n;
+    char        msg_type[MSG_TYPE_LEN];
+
+    strcpy(msg_type, "JG\0");
 
     // Allocate and initialiase the names.
     client_name = malloc(CLIENT_NAME_LEN);
@@ -225,7 +313,11 @@ void join_game_response(char *buffer, client_t *client) {
         err_die_server(output, "Could not find the requested game!");
     }
 
+    pthread_mutex_lock(&clients_mutex);
+
     client->game = chosen_game;
+
+    pthread_mutex_unlock(&clients_mutex);
 
     // Copy the names to the corresponding fields.
     strcpy(client->player->name, client_name);
@@ -233,32 +325,39 @@ void join_game_response(char *buffer, client_t *client) {
     // Create a password for the client.
     generate_password(output, client);
 
+    buffer = buffer - 3;
     // Set a response back to the client.
     memset(buffer, '\0', BUF_SIZE_WO_TYPE);
-    serialize_msg_JG_response(buffer, client);
+    strcpy(buffer, msg_type);
+    serialize_msg_JG_response(buffer+3, client);
+
+    data_n = send(client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
+    if (data_n < 0) {
+        err_die_server(output, "Could not send message of type JG!");
+    }
 
     free(client_name);
 
     // Log the response.
     log_join_game_response(output, client);
-    // pthread_mutex_unlock(&clients_mutex);
 
     /* Notify other players */
 
-    char *buffer_notify;
-    char            msg_type[MSG_TYPE_LEN];
+    // char            *buffer_notify;
+    // char            msg_type[MSG_TYPE_LEN];
     char            send_err_msg[ERR_MSG_LEN];
     client_node_t   *current;
-    ssize_t         data_n;
 
     current = clients_start;
     strcpy(msg_type, "NF\0");
-    buffer_notify = malloc(MAX_BUFFER_SIZE);
+    // buffer_notify = malloc(MAX_BUFFER_SIZE);
+    // buffer = buffer - 3;
 
     while (current != NULL) {
-        memset(buffer_notify, '\0', MAX_BUFFER_SIZE);
+        memset(buffer, '\0', MAX_BUFFER_SIZE);
 
-        // Sending this type of msg for the client himself.
+        // Do NOT send this type of msg for the client himself. As I understood
+        // its gonna be sent in handle_client in any case back to client.
         if (current->client->player->ID == client->player->ID) {
             current = current->next_client;
             continue;
@@ -266,10 +365,10 @@ void join_game_response(char *buffer, client_t *client) {
 
         if (current->client->game->ID == chosen_game->ID) {
             serialize_msg_NOTIFY(
-                buffer_notify, msg_type, client->player->ID, client->player->name
+                buffer, msg_type, client->player->ID, client->player->name
             );
 
-            data_n = send(current->client->sock_fd, buffer_notify, MAX_BUFFER_SIZE, 0);
+            data_n = send(current->client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
             if (data_n < 0) {
                 sprintf(send_err_msg, "Could not send message of type %s!", msg_type);
                 err_die_server(output, send_err_msg);
@@ -287,7 +386,7 @@ void join_game_response(char *buffer, client_t *client) {
 
 void handle_message(char *buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN] = { buffer[0], buffer[1], '\0' };
-    char err_msg[ERR_MSG_LEN];
+    // char err_msg[ERR_MSG_LEN];
 
     buffer = buffer + 3; // Pass the point of buffer after msg_type.
     // log_recvd_msg_type(output, client, msg_type);
@@ -316,6 +415,10 @@ void handle_message(char *buffer, client_t *client) {
         log_recvd_msg_type(output, client, msg_type);
 
         join_game_response(buffer, client);
+    } else if (strcmp(msg_type, "SG") == 0) { // START GAME 
+        log_recvd_msg_type(output, client, msg_type);
+
+        start_game_response(buffer, client);
     } else if (strcmp(msg_type, "PI") == 0) { // PING PONG
         buffer = buffer - 3;
         buffer[0] = 'P';
@@ -323,8 +426,8 @@ void handle_message(char *buffer, client_t *client) {
         buffer[2] = '\0';
     } else {
         // NOTE: Have a function - print_log AND send_err_msg() in one func.
-        sprintf(err_msg, "Received an unknown type - %s", msg_type);
-        err_die_server(output, err_msg);
+        // sprintf(err_msg, "Received an unknown type - %s", msg_type);
+        // err_die_server(output, err_msg);
     }
 }
 
@@ -376,6 +479,7 @@ void *handle_client(void *arg) {
     free(buffer);
 
     // Remove the client from the global LL and check for errors.
+    pthread_mutex_lock(&clients_mutex);
     del_ret = remove_by_client_id(output, &clients_start, client->player->ID);
     if (del_ret != RGOOD) {
         sprintf(err_msg, "Could not delete client by ID. ERROR: %d", del_ret);
@@ -383,6 +487,8 @@ void *handle_client(void *arg) {
     }
 
     client_count--;
+
+    pthread_mutex_unlock(&clients_mutex);
 
     // End thread instantlly.
     pthread_detach(pthread_self());
@@ -535,7 +641,6 @@ FILE *change_log_output(FILE *fp, char *path) {
 }
 
 void init_client(client_t **client, int client_sock) {
-    // pthread_mutex_lock(&clients_mutex);
     // Client struct allocation.
     *client = malloc(sizeof(client_t));
     if (*client == NULL) {
@@ -586,16 +691,17 @@ void init_client(client_t **client, int client_sock) {
     (*client)->sock_fd = client_sock;
 
     // Increase the count of players on the server.
+    pthread_mutex_lock(&clients_mutex);
+
     client_count++;
 
     // Save this client in the global clients list.
     push_client(&clients_start, client);
 
-    // pthread_mutex_unlock(&clients_mutex);
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void init_game(game_t **game, int chosen_field_id) {
-    // pthread_mutex_lock(&clients_mutex);
     track_t *chosen_track;
 
     // Game struct allocation.
@@ -627,12 +733,14 @@ void init_game(game_t **game, int chosen_field_id) {
     (*game)->track = chosen_track;
 
     // Increase the count of games on the server.
+    pthread_mutex_lock(&clients_mutex);
+
     game_count++;
 
     // Save this game in the global games list.
     push_game(&games_start, game);
 
-    // pthread_mutex_unlock(&clients_mutex);
+    pthread_mutex_unlock(&clients_mutex);
 }
 
 void init_tracks(track_t **track) {
