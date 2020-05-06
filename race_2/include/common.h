@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <pthread.h>
 #include <time.h>
+#include <sys/time.h>
 #include <getopt.h>
 #include <ncurses.h>
 #include <sys/types.h> // pthread_mutex_t, pthread_cond_t etc.

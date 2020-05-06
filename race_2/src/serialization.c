@@ -450,6 +450,8 @@ int deserialize_msg_UP_response(
     struct Player_info ***p_arr
 ) {
     int game_id;
+    struct Player_info *one_player = malloc(sizeof(struct Player_info));
+    memset(one_player->name, '\0', CLIENT_NAME_LEN);
 
     buffer = deserialize_string(buffer, msg_type , MSG_TYPE_LEN);
     buffer = deserialize_int(buffer, &game_id);
@@ -459,24 +461,35 @@ int deserialize_msg_UP_response(
         return -1;
     }
 
-    int count, pid, i;
+    int count;/*  pid, i; */
     buffer = deserialize_int(buffer, &count);
 
-    for (i = 0; i < count; i++) {
-        buffer = deserialize_int(buffer, &pid);
+    // for (i = 0; i < count; i++) {
+    //     buffer = deserialize_int(buffer, &pid);
 
-        if ((*p_arr)[i]->ID == pid) {
-            buffer = deserialize_string(buffer, (*p_arr)[i]->name, CLIENT_NAME_LEN);
-            buffer = deserialize_float(buffer, &((*p_arr)[i]->position.x));
-            buffer = deserialize_float(buffer, &((*p_arr)[i]->position.y));
-            buffer = deserialize_float(buffer, &((*p_arr)[i]->angle));
-            buffer = deserialize_float(buffer, &((*p_arr)[i]->speed));
-            buffer = deserialize_float(buffer, &((*p_arr)[i]->acceleration));
-            buffer = deserialize_int(buffer, &((*p_arr)[i]->laps));
+    //     if ((*p_arr)[i]->ID == pid) {
+    //         buffer = deserialize_string(buffer, (*p_arr)[i]->name, CLIENT_NAME_LEN);
+    //         buffer = deserialize_float(buffer, &((*p_arr)[i]->position.x));
+    //         buffer = deserialize_float(buffer, &((*p_arr)[i]->position.y));
+    //         buffer = deserialize_float(buffer, &((*p_arr)[i]->angle));
+    //         buffer = deserialize_float(buffer, &((*p_arr)[i]->speed));
+    //         buffer = deserialize_float(buffer, &((*p_arr)[i]->acceleration));
+    //         buffer = deserialize_int(buffer, &((*p_arr)[i]->laps));
 
-            break;
-        }
-    }
+    //         break;
+    //     }
+    // }
 
-    return i;
+    buffer = deserialize_int(buffer, &(one_player->ID));
+    buffer = deserialize_string(buffer, one_player->name, CLIENT_NAME_LEN);
+    buffer = deserialize_float(buffer, &(one_player->position.x));
+    buffer = deserialize_float(buffer, &(one_player->position.y));
+    buffer = deserialize_float(buffer, &(one_player->angle));
+    buffer = deserialize_float(buffer, &(one_player->speed));
+    buffer = deserialize_float(buffer, &(one_player->acceleration));
+    buffer = deserialize_int(buffer, &(one_player->laps));
+
+    printf("p name: %s\n", one_player->name);
+
+    return 0;
 }

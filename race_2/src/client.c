@@ -28,9 +28,9 @@ int  port;
 int control_c_safe = 0;
 int start_game_sig = 0;
 
-// Stores info about other players of a game.
-// Assign address of other_pi_arr_of_p for easier pointer management/iteration.
-struct Player_info ***SG_pi_others;
+// // Stores info about other players of a game.
+// // Assign address of other_pi_arr_of_p for easier pointer management/iteration.
+// struct Player_info ***SG_pi_others;
 
 // Helper function prototypes.
 void handle_sigint(int sig);
@@ -46,13 +46,16 @@ void init_tracks();
 /* The main functions for communication */
 
 // start_game handles actual game process or gameplay.
-void start_game(char *buffer, client_t *client) {
+void start_game(char *buffer, client_t *client, struct Player_info ***SG_pi_others) {
     printf("\nGame started!\n");
     
     char                msg_type[MSG_TYPE_LEN];
-    int                 udpsock, n, ret;
+    int                 udpsock, n, ret, tcp_sock;
     socklen_t           len;
     struct sockaddr_in  serv_addr;
+
+    // Save this fd to later close it.
+    tcp_sock = client->sock_fd;
 
     udpsock = socket(AF_INET, SOCK_DGRAM, 0);
     if (udpsock < 0) {
@@ -64,6 +67,11 @@ void start_game(char *buffer, client_t *client) {
     serv_addr.sin_family        = AF_INET;
     serv_addr.sin_addr.s_addr   = inet_addr(ip);
     serv_addr.sin_port          = htons(port+1);
+
+    ret = connect(udpsock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+    if (ret < 0) {
+        err_die_client(output, "Could not connect UDP socket!");
+    }
 
     /* UPDATE PLAYER */
 
@@ -87,6 +95,9 @@ void start_game(char *buffer, client_t *client) {
             udpsock, (char*)buffer, MAX_BUFFER_SIZE, MSG_WAITALL,
             (struct sockaddr*)&serv_addr, &len
         );
+        if (n < 0) {
+            err_die_client(output, "Receiving data from UDP sokcet failed!");
+        }
 
         // NOTE:? Might need to manage in a seperate thread if this is blocking.
         // while (strlen(buffer) == 0) {
@@ -111,6 +122,9 @@ void start_game(char *buffer, client_t *client) {
         
         // }
     } while (1); // Or other gameplay info is met. END GAME
+
+    close(udpsock);
+    close(tcp_sock);
 }
 
 // join_game requests to join the game of game_id and waits until gets message
@@ -168,8 +182,9 @@ void join_game(char *buffer, client_t *client, int game_id) {
     int client_count;
     struct Player_info **other_pi_arr_of_p; // To assign values inside 
     // deseriaization func.
-    // struct Player_info ***p; // Assign address of other_pi_arr_of_p for
-    // easier pointer management/iteration.
+    // Stores info about other players of a game.
+    // Assign address of other_pi_arr_of_p for easier pointer management/iteration.
+    struct Player_info ***SG_pi_others;
 
     while (1) {
         memset(buffer,   '\0', MAX_BUFFER_SIZE);
@@ -436,6 +451,9 @@ void create_game(char *buffer, client_t *client, int field_id) {
     int client_count;
     struct Player_info **other_pi_arr_of_p; // To assign values inside 
     // deseriaization func.
+    // Stores info about other players of a game.
+    // Assign address of other_pi_arr_of_p for easier pointer management/iteration.
+    struct Player_info ***SG_pi_others;
 
     printf(
         "%s%sWaiting for other players to join...%s\n", 
@@ -498,6 +516,8 @@ void create_game(char *buffer, client_t *client, int field_id) {
     }
 
     free(name_buf);
+
+    start_game(buffer, client, SG_pi_others);
 }
 
 int main(int argc, char **argv) {
@@ -598,7 +618,7 @@ int main(int argc, char **argv) {
         err_die_client(output, "The answer is invalid!");
     }
 
-    start_game(buffer, client);
+    // start_game(buffer, client);
 
     /* Exit program gracefully */
 
@@ -759,7 +779,11 @@ void init_game(game_t **game) {
     (*game)->game_h->WinnerPlayerID    = -1;
 
     // Save this game in the global games list.
-    push_game(&games_start, game);
+    push_game(&games_start, game);// Stores info about other players of a game.
+// // Assign address of other_pi_arr_of_p for easier pointer management/iteration.
+// struct Player_info ***SG_pi_others;// Stores info about other players of a game.
+// // Assign address of other_pi_arr_of_p for easier pointer management/iteration.
+// struct Player_info ***SG_pi_others;
 }
 
 void init_tracks(track_t **track) {

@@ -54,30 +54,65 @@ void gameplay(char *buffer, client_t *client, int g_client_count, client_t *g_cl
     socklen_t           len;
     // client_t            *orig_client;
 
+    int opt = TRUE;
+    int master_socket, addrlen, new_socket, client_socket[MAX_CLIENTS_ON_SERVER],
+        activity, i, valread, sd;
+    int max_sd;
+    struct sockaddr_in address;
+
+    fd_set readfds;
+
+    for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
+        client_socket[i] = 0;
+    }
+
+    master_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (master_socket == 0) {
+        err_die_server(output, "UDP socket failed!");
+    }
+
+    ret = setsockopt(master_socket, SOL_SOCKET, SO_REUSEADDR, (char*)&opt, sizeof(opt));
+    if (ret < 0) {
+        err_die_server(output, "Setsockopt failed!");
+    }
+
+    serv_addr.sin_family        = AF_INET;
+    serv_addr.sin_addr.s_addr   = INADDR_ANY;
+    serv_addr.sin_port          = htons(port+1);
+
+    ret = bind(master_socket, (const struct sockaddr*)&address, sizeof(address));
+    if (ret < 0) {
+        err_die_server(output, "Could not bind UDP socket!");
+    }
+
+    // Max of 3 pending connection.
+    ret = listen(master_socket, 3);
+    if (ret < 0) {
+        err_die_server(output, "Listening UDP failed!");
+    }
+
+    addrlen = sizeof(address);
+
     printf("Gameplay\n");
 
     // orig_client = client;
     game_id = client->game->ID;
 
-    udpsock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (udpsock < 0) {
-        // NOTE: Send a response back, saying that UDP failed.
-        err_die_server(output, "Could not create a UDP socket!");
-    }
+    // udpsock = socket(AF_INET, SOCK_DGRAM, 0);
+    // if (udpsock < 0) {
+    //     // NOTE: Send a response back, saying that UDP failed.
+    //     err_die_server(output, "Could not create a UDP socket!");
+    // }
 
-    memset(&serv_addr,   0, sizeof(serv_addr));
-    memset(&client_addr, 0, sizeof(client_addr));
+    // memset(&serv_addr,   0, sizeof(serv_addr));
+    // memset(&client_addr, 0, sizeof(client_addr));
 
-    serv_addr.sin_family        = AF_INET;
-    serv_addr.sin_addr.s_addr   = htonl(INADDR_ANY);
-    serv_addr.sin_port          = htons(port+1);
+    // ret = bind(udpsock, (const struct sockaddr*)&serv_addr, sizeof(serv_addr));
+    // if (ret < 0) {
+    //     err_die_server(output, "Could not bind UDP socket!");
+    // }
 
-    ret = bind(udpsock, (const struct sockaddr*)&serv_addr, sizeof(serv_addr));
-    if (ret < 0) {
-        err_die_server(output, "Could not bind UDP socket!");
-    }
-
-    len = sizeof(client_addr);
+    // len = sizeof(client_addr);
 
     /* UPDATE PLAYER */
 
@@ -86,6 +121,29 @@ void gameplay(char *buffer, client_t *client, int g_client_count, client_t *g_cl
     // NOTE: In principle, using already initialized client struct to overwrite
     // received data of every player on this udp socket.
     do {
+        // Clear the socket set.
+        FD_ZERO(&readfds);
+
+        // Add master socket to set.
+        FD_SET(master_socket, &readfds);
+        max_sd = master_socket;
+
+        // Add child to socket set.
+        for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
+            // Socket descriptor.
+            sd = client_socket[i];
+
+            if (sd > 0) {
+                FD_SET(sd, &readfds);
+            }
+
+            if (sd > max_sd) {
+                max_sd = sd;
+            }
+        }
+
+
+        // ---
         memset(buffer, '\0', MAX_BUFFER_SIZE);
 
         while (strlen(buffer) == 0) {
@@ -112,7 +170,7 @@ void gameplay(char *buffer, client_t *client, int g_client_count, client_t *g_cl
         // NOTE: Broadcast to all clients listening on udpsock?
         n = sendto(
             udpsock, (const char*)buffer, MAX_BUFFER_SIZE, MSG_CONFIRM,
-            (const struct sockaddr*)&serv_addr, sizeof(serv_addr)
+            (const struct sockaddr*)&client_addr, sizeof(client_addr)
         );
         if (n < 0) {
             err_die_server(output, "Failed to send data over UDP socket!");
