@@ -86,7 +86,7 @@ void gameplay(
     }
 
     address.sin_family        = AF_INET;
-    address.sin_addr.s_addr   = INADDR_ANY;
+    address.sin_addr.s_addr   = htonl(INADDR_ANY);
     address.sin_port          = htons(port+1);
 
     ret = bind(master_socket, (const struct sockaddr*)&address, sizeof(address));
@@ -95,7 +95,7 @@ void gameplay(
     }
 
     // Max of 3 pending connection.
-    ret = listen(master_socket, 1);
+    ret = listen(master_socket, 4);
     if (ret < 0) {
         err_die_server(output, "Listening UDP failed!");
     }
@@ -110,8 +110,13 @@ void gameplay(
 
     strcpy(msg_type, "UP\0");
 
+    struct timeval tv;
+
     // Manage the connections in a loop.
     do {
+        tv.tv_sec = 5; 
+        tv.tv_usec = 0;
+
         // Clear the socket set.
         FD_ZERO(&readfds);
 
@@ -135,7 +140,7 @@ void gameplay(
 
         // Wait for an acitivity on one of the sockets, timeout is NULL -
         // so wait indefinintely.
-        activity = select(max_sd+1, &readfds, NULL, NULL, NULL);
+        activity = select(max_sd+1, &readfds, NULL, NULL, &tv);
 
         if ((activity < 0) && (errno!=EINTR)) {
             fprintf(output, "Select() failed!");

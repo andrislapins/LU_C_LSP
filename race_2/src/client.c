@@ -49,8 +49,8 @@ void init_tracks();
 void start_game(
     char *buffer, client_t *client, struct Player_info ***SG_pi_others
 ) {
-    printf("\nGame started! Wait 5 seconds\n");
-    sleep(5);
+    printf("\nGame started! Wait 2 seconds\n");
+    sleep(2);
     
     char                msg_type[MSG_TYPE_LEN];
     int                 udpsock;
@@ -78,7 +78,7 @@ void start_game(
     memset(&their_addr, 0, sizeof(their_addr));
 
     their_addr.sin_family        = AF_INET;
-    their_addr.sin_addr.s_addr   = INADDR_ANY;
+    their_addr.sin_addr.s_addr   = htonl(INADDR_ANY);
     their_addr.sin_port          = htons(port+1);
     bzero(&(their_addr.sin_zero), 8); 
 
@@ -94,7 +94,7 @@ void start_game(
     // NOTE: make send/recv non-blocking?
     do {
         // SOME ACTION OF THIS PLAYER... (client)
-        
+
         printf("loop1\n");
         memset(buffer, '\0', MAX_BUFFER_SIZE);
         serialize_msg_UP(buffer, msg_type, client);
@@ -112,12 +112,13 @@ void start_game(
 
         // Receive data about every player of the game.
         n = recvfrom(
-            udpsock, (char*)buffer, MAX_BUFFER_SIZE, MSG_DONTWAIT,
+            udpsock, (char*)buffer, MAX_BUFFER_SIZE, 0,
             (struct sockaddr*)&their_addr, &len
         );
         if (n < 0) {
             err_die_client(output, "Receiving data from UDP sokcet failed!");
         }
+
 
         // Returns -1 if the info is not part if this player's game.
         ret = deserialize_msg_UP_response(
@@ -239,6 +240,8 @@ void join_game(char *buffer, client_t *client, int game_id) {
     }
 
     free(name_buf);
+
+    start_game(buffer, client, SG_pi_others);
 }
 
 // list_games return the chosen game's ID which client will join.
