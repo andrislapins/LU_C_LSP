@@ -91,11 +91,13 @@ void deserialize_msg_SG_response(
 void serialize_msg_UP(char *buffer, char *msg_type, client_t *client);
 void deserialize_msg_UP(char *buffer, char *msg_type, client_t *client);
 void serialize_msg_UP_response(
-    char *buffer, char *msg_type, FILE *fp, client_t *client, int client_count, 
-    int game_id, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+    char *buffer, char *msg_type, FILE *fp,
+    int game_id, int client_count,
+    client_t *g_clients[MAX_CLIENTS_PER_GAME]
 );
 int deserialize_msg_UP_response(
-    char *buffer, char *msg_type, client_t *client, struct Player_info ***p_arr
+    char *buffer, char *msg_type, client_t *client,
+    struct Player_info ***other_pi_arr_of_p, int *client_count
 );
 
 #endif

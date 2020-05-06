@@ -47,21 +47,30 @@ void init_client(client_t **client, int client_sock);
 void init_game(game_t **game, int chosen_field_id);
 void init_tracks();
 
-void gameplay(char *buffer, client_t *client, int g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]) {
+void gameplay(
+    char *buffer, client_t *client, 
+    int g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+) {
     char                msg_type[MSG_TYPE_LEN];
-    int                 udpsock, ret, n, game_id;
-    struct sockaddr_in  serv_addr, client_addr;
-    socklen_t           len;
-    // client_t            *orig_client;
+    // NOTE: client_t *t client arg - is being used as a "placeholder"
+    // for overwriting incoming player data.
 
+    int client_socket[MAX_CLIENTS_ON_SERVER]; // NOTE:? Or MAX_CLIENTS_PER_GAME.
+    int master_socket;
+    int new_socket;
+    int activity;
     int opt = TRUE;
-    int master_socket, addrlen, new_socket, client_socket[MAX_CLIENTS_ON_SERVER],
-        activity, i, valread, sd;
+    int addrlen; 
+    int valread;
     int max_sd;
-    struct sockaddr_in address;
+    int sd;
+    int ret;
+    int i;
 
+    struct sockaddr_in address;
     fd_set readfds;
 
+    // Set up the sets and connections.    
     for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
         client_socket[i] = 0;
     }
@@ -76,9 +85,9 @@ void gameplay(char *buffer, client_t *client, int g_client_count, client_t *g_cl
         err_die_server(output, "Setsockopt failed!");
     }
 
-    serv_addr.sin_family        = AF_INET;
-    serv_addr.sin_addr.s_addr   = INADDR_ANY;
-    serv_addr.sin_port          = htons(port+1);
+    address.sin_family        = AF_INET;
+    address.sin_addr.s_addr   = INADDR_ANY;
+    address.sin_port          = htons(port+1);
 
     ret = bind(master_socket, (const struct sockaddr*)&address, sizeof(address));
     if (ret < 0) {
@@ -93,33 +102,15 @@ void gameplay(char *buffer, client_t *client, int g_client_count, client_t *g_cl
 
     addrlen = sizeof(address);
 
-    printf("Gameplay\n");
+    printf("\nGAMEPLAY\n\n");
 
-    // orig_client = client;
     game_id = client->game->ID;
-
-    // udpsock = socket(AF_INET, SOCK_DGRAM, 0);
-    // if (udpsock < 0) {
-    //     // NOTE: Send a response back, saying that UDP failed.
-    //     err_die_server(output, "Could not create a UDP socket!");
-    // }
-
-    // memset(&serv_addr,   0, sizeof(serv_addr));
-    // memset(&client_addr, 0, sizeof(client_addr));
-
-    // ret = bind(udpsock, (const struct sockaddr*)&serv_addr, sizeof(serv_addr));
-    // if (ret < 0) {
-    //     err_die_server(output, "Could not bind UDP socket!");
-    // }
-
-    // len = sizeof(client_addr);
 
     /* UPDATE PLAYER */
 
     strcpy(msg_type, "UP\0");
 
-    // NOTE: In principle, using already initialized client struct to overwrite
-    // received data of every player on this udp socket.
+    // Manage the connections in a loop.
     do {
         // Clear the socket set.
         FD_ZERO(&readfds);
@@ -142,41 +133,79 @@ void gameplay(char *buffer, client_t *client, int g_client_count, client_t *g_cl
             }
         }
 
+        // Wait for an acitivity on one of the sockets, timeout is NULL -
+        // so wait indefinintely.
+        activity = select(max_sd+1, &readfds, NULL, NULL, NULL);
 
-        // ---
-        memset(buffer, '\0', MAX_BUFFER_SIZE);
+        if ((activity < 0) && (errno!=EINTR)) {
+            fprintf(output, "Select() failed!");
+        }
 
-        while (strlen(buffer) == 0) {
-            n = recvfrom(
-                udpsock, (char*)buffer, MAX_BUFFER_SIZE, MSG_WAITALL, 
-                (struct sockaddr*)&client_addr, &len
-            );
-            if (n < 0) {
-                err_die_server(output, "Receiving data from UDP sokcet failed!");
+        // If something happened on the master socket, then its an incoming
+        // connection.
+        if (FD_ISSET(master_socket, &readfds)) {
+            new_socket = accept(master_socket, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+            if (new_socket < 0) {
+                err_die_server(output, "UDP accept failed!");
+            }
+
+            // Display of socket number - used in send and receive commands  
+            printf("New connection , socket fd is %d , ip is : %s , port : %d\n",
+                    new_socket, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+
+            // SENDING INITIAL MESSAGE: send all player data maybe.
+            ret = send(new_socket, buffer, MAX_BUFFER_SIZE, 0);
+            if (ret) {
+                fprintf(output, "Return value from send() = %d\n", ret);
+                err_die_server(output, "Failed to send message!");
+            }
+
+            // Add new socket to array of sockets.
+            for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
+                // If position is empty.
+                if (client_socket[i] == 0) {
+                    client_socket[i] = new_socket;
+                    fprintf(output, "Adding to list of sockets as %d\n", i);
+
+                    break;
+                }
             }
         }
 
-        buffer[n] = '\0';
-        
-        deserialize_msg_UP(buffer, msg_type, client);
+        // Else its some IO operation on some other socket.
+        for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
+            sd = client_socket[i];
 
-        // MANAGE DATA according to player id.... (edit client var).
+            if (FD_ISSET(sd, &readfds)) {
+                // Check if it was for closing, and also read the incoming message.
+                if ((valread = read(sd, buffer, MAX_BUFFER_SIZE)) == 0) {
+                    getpeername(sd, (struct sockaddr*)&address, (socklen_t*)&addrlen);
+                    fprintf(
+                        output, "Client disconnected, ip %s, port %d\n",
+                        inet_ntoa(address.sin_addr), ntohs(address.sin_port)
+                    );
 
-        memset(buffer, '\0', MAX_BUFFER_SIZE);
-        serialize_msg_UP_response(
-            buffer, msg_type, output, client, game_id, g_client_count, g_clients
-        );
+                    close(sd);
+                    client_socket[i] = 0;
+                }
+            }
+            // Send a message
+            else
+            {
+                // Deserialization and serialization of player data.
+                deserialize_msg_UP(buffer, msg_type, client);
 
-        // NOTE: Broadcast to all clients listening on udpsock?
-        n = sendto(
-            udpsock, (const char*)buffer, MAX_BUFFER_SIZE, MSG_CONFIRM,
-            (const struct sockaddr*)&client_addr, sizeof(client_addr)
-        );
-        if (n < 0) {
-            err_die_server(output, "Failed to send data over UDP socket!");
+                // Overwrite data of the received client/players.
+
+                memset(buffer, '\0', MAX_BUFFER_SIZE);
+
+                serialize_msg_UP_response(
+                    buffer, msg_type, output, game_id, g_client_count, g_clients
+                );
+
+                send(sd, buffer, MAX_BUFFER_SIZE, 0);
+            }
         }
-
-        // ...
     } while (1);
 
     // END all the connection of the players of this game.
@@ -188,11 +217,13 @@ void start_game_response(char *buffer, client_t *client) {
     char            msg_type[MSG_TYPE_LEN];
     char            send_err_msg[ERR_MSG_LEN];
     char            *password;
-    client_node_t   *other, *current;
+    // client_node_t   *current;
     ssize_t         data_n;
     int             game_id;
     int             g_client_count;
+    int             i;
 
+    // Save received password in temporal space.
     password = malloc(CLIENT_PASS_LEN);
     if (password == NULL) {
         err_die_server(output, "Could not allocate memory for password when starting game!");
@@ -208,12 +239,11 @@ void start_game_response(char *buffer, client_t *client) {
 
     strcpy(msg_type, "SG\0");
 
-    // Collect the players (client_t) of the chosen game.
-    current = clients_start;
+    // Collect the players info (client_t) of the chosen game.
+    client_node_t *current = clients_start;
     g_client_count = 0;
 
-    // OPTION: compare on adding "|| g_client_count < MAX_CLIENTS_PER_GAME".
-    for(int i = 0; current != NULL; i++) {
+    for(i = 0; current != NULL && g_client_count < MAX_CLIENTS_PER_GAME; i++) {
         if(current->client->game->ID == game_id) {
             g_clients[g_client_count] = current->client;
             g_client_count++;
@@ -224,8 +254,6 @@ void start_game_response(char *buffer, client_t *client) {
 
     /* Initialize the values to create the SG msg */
 
-    other = clients_start; // "Other client".
-
     // Start from the begging (overwriting msg type too).
     buffer = buffer - 3;
 
@@ -235,22 +263,21 @@ void start_game_response(char *buffer, client_t *client) {
     serialize_msg_SG_response(
         buffer, msg_type, g_client_count, g_clients, client->game
     );
-    
-    // for () over g_clients NOTE!!
-    while (other != NULL) {
-        if (other->client->game->ID == client->game->ID) {
-            data_n = send(other->client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
+
+    // Send the START GAME (info about all the players of the game)
+    // to all players of the game.    
+    for (i = 0; i < g_client_count; i++) {
+        if (g_clients[i]->game->ID == client->game->ID) {
+            data_n = send(g_clients[i]->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
             if (data_n < 0) {
                 sprintf(send_err_msg, "Could not send message of type %s!", msg_type);
                 err_die_server(output, send_err_msg);
             }
 
-            log_msg_SG_sent(output, msg_type, other->client->player->ID, 
-                other->client->player->name, client
+            log_msg_SG_sent(output, msg_type, g_clients[i]->player->ID, 
+                g_clients[i]->player->name, client
             );
         }
-
-        other = other->next_client;
     }
 
     free(password);

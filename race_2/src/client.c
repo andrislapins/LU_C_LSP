@@ -46,32 +46,45 @@ void init_tracks();
 /* The main functions for communication */
 
 // start_game handles actual game process or gameplay.
-void start_game(char *buffer, client_t *client, struct Player_info ***SG_pi_others) {
+void start_game(
+    char *buffer, client_t *client, struct Player_info ***SG_pi_others
+) {
     printf("\nGame started!\n");
     
     char                msg_type[MSG_TYPE_LEN];
-    int                 udpsock, n, ret, tcp_sock;
+    int                 udpsock;
+    int                 tcp_sock;
+    int                 n;
+    int                 ret;
+    int                 client_count;
     socklen_t           len;
-    struct sockaddr_in  serv_addr;
+    struct sockaddr_in  their_addr;
+    // struct hostent      *he;
 
     // Save this fd to later close it.
     tcp_sock = client->sock_fd;
+
+    // if ((he=gethostbyname(argv[1])) == NULL) {  /* get the host info */
+    //         herror("gethostbyname");
+    //         exit(1);
+    //     }
 
     udpsock = socket(AF_INET, SOCK_DGRAM, 0);
     if (udpsock < 0) {
         err_die_client(output, "Could not create UDP connection!");
     }
 
-    memset(&serv_addr, 0, sizeof(serv_addr));
+    memset(&their_addr, 0, sizeof(their_addr));
 
-    serv_addr.sin_family        = AF_INET;
-    serv_addr.sin_addr.s_addr   = inet_addr(ip);
-    serv_addr.sin_port          = htons(port+1);
+    their_addr.sin_family        = AF_INET;
+    their_addr.sin_addr.s_addr   = inet_addr(ip);
+    their_addr.sin_port          = htons(port+1);
+    bzero(&(their_addr.sin_zero), 8); 
 
-    ret = connect(udpsock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-    if (ret < 0) {
-        err_die_client(output, "Could not connect UDP socket!");
-    }
+    // ret = connect(udpsock, (struct sockaddr *)&their_addr, sizeof(their_addr));
+    // if (ret < 0) {
+    //     err_die_client(output, "Could not connect UDP socket!");
+    // }
 
     /* UPDATE PLAYER */
 
@@ -79,48 +92,46 @@ void start_game(char *buffer, client_t *client, struct Player_info ***SG_pi_othe
 
     // NOTE: make send/recv non-blocking?
     do {
-        // SOME ACTION OF THIS PLAYER...
+        // SOME ACTION OF THIS PLAYER... (client)
 
         memset(buffer, '\0', MAX_BUFFER_SIZE);
         serialize_msg_UP(buffer, msg_type, client);
 
-        sendto(
+        // Send about yourself new data.
+        ret = sendto(
             udpsock, (const char*)buffer, MAX_BUFFER_SIZE, MSG_CONFIRM,
-            (const struct sockaddr*)&serv_addr, sizeof(serv_addr)
+            (const struct sockaddr*)&their_addr, sizeof(their_addr)
         );
+        if (ret < 0) {
+            err_die_client(output, "Failed to send data!");
+        }
 
         memset(buffer, '\0', MAX_BUFFER_SIZE);
 
+        // Receive data about every player of the game.
         n = recvfrom(
             udpsock, (char*)buffer, MAX_BUFFER_SIZE, MSG_WAITALL,
-            (struct sockaddr*)&serv_addr, &len
+            (struct sockaddr*)&their_addr, &len
         );
         if (n < 0) {
             err_die_client(output, "Receiving data from UDP sokcet failed!");
         }
 
-        // NOTE:? Might need to manage in a seperate thread if this is blocking.
-        // while (strlen(buffer) == 0) {
+        // Returns -1 if the info is not part if this player's game.
         ret = deserialize_msg_UP_response(
-            buffer, msg_type, client, SG_pi_others
+            buffer, msg_type, client, SG_pi_others, &client_count
         );
         if (ret == -1) {
+            fprintf(output, "Game info NOT for this player!");
             continue;
         }
 
-            // memset(buffer, '\0', MAX_BUFFER_SIZE);
+        // Log that received info.
+        log_msg_UP_received(output, msg_type, client_count, SG_pi_others);
 
-            // n = recvfrom(
-            //     udpsock, (char*)buffer, MAX_BUFFER_SIZE, MSG_WAITALL,
-            //     (struct sockaddr*)&serv_addr, &len
-            // );
-
-            // Log that message about a player has been received.
-        log_msg_UP_received(output, msg_type, (*SG_pi_others)[ret]);
         // DISPLAY the new data about the received player... after which - exit loop.
         // ....
-        
-        // }
+
     } while (1); // Or other gameplay info is met. END GAME
 
     close(udpsock);
@@ -174,15 +185,15 @@ void join_game(char *buffer, client_t *client, int game_id) {
 
     /* Get notified about new players */
 
-    // NOTE: Sit in a while loop and get notified about new players joining (max 4) 
+    // Sit in a while loop and get notified about new players joining (max 4) 
     // until client wants to send a START GAME request.
     int     pid;
 
     // NOTE: Should store these values globally.
     int client_count;
     struct Player_info **other_pi_arr_of_p; // To assign values inside 
-    // deseriaization func.
-    // Stores info about other players of a game.
+                                            // deseriaization func.
+                                            // Stores info about other players of a game.
     // Assign address of other_pi_arr_of_p for easier pointer management/iteration.
     struct Player_info ***SG_pi_others;
 

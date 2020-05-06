@@ -653,12 +653,14 @@ void log_msg_UP_sent(FILE *fp, char *msg_type, client_t *client) {
     log_client_info(fp, client);
     fprintf(
         fp, 
-        "(%s) Sent info about %s to every player of the game\n",
-        msg_type, client->player->name
+        "(%s) Sent info about %s%s%s\n",
+        msg_type, ANSI_YELLOW, client->player->name, ANSI_RESET_ALL
     );
 }
 
-void log_msg_UP_received(FILE *fp, char *msg_type, struct Player_info *player) {
+void log_msg_UP_received(
+    FILE *fp, char *msg_type, int g_client_count, struct Player_info ***p
+) {
     log_time_header(fp);
     fprintf(
         fp,
@@ -671,9 +673,51 @@ void log_msg_UP_received(FILE *fp, char *msg_type, struct Player_info *player) {
         ANSI_GREEN, ANSI_RESET_ALL,
         msg_type
     );
-    fprintf(
-        fp,
-        "Received new player info from %s%s%s\n",
-        ANSI_YELLOW, player->name, ANSI_RESET_ALL
-    );
+    
+    // Displaying player info one by one.
+    for(int i = 0; i < g_client_count; i++) {
+        fprintf(
+            fp,
+            "%sPlayer ID%s: %d\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->ID
+        );
+        fprintf(
+            fp,
+            "%sPlayer Name%s: %s%s%s\n",
+            ANSI_GREEN, ANSI_RESET_ALL, ANSI_YELLOW,
+            (*p)[i]->name,
+            ANSI_YELLOW
+        );
+        fprintf(
+            fp,
+            "%sPlayer positon%s x: %f, y: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->position.x, (*p)[i]->position.y
+        );
+        fprintf(
+            fp,
+            "%sPlayer angle%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->angle
+        );
+        fprintf(
+            fp,
+            "%sPlayer speed%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->speed
+        );
+        fprintf(
+            fp,
+            "%sPlayer acceleration%s: %f\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->acceleration
+        );
+        fprintf(
+            fp,
+            "%sPlayer laps%s: %d\n\n",
+            ANSI_GREEN, ANSI_RESET_ALL,
+            (*p)[i]->laps
+        );
+    }
 }

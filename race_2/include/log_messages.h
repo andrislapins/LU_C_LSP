@@ -45,7 +45,11 @@ void log_msg_SG_sent(
     FILE *fp, char *msg_type, int pid, char *p_name, client_t *client
 );
 
-void log_msg_UP_sent(FILE *fp, char *msg_type, client_t *client);
-void log_msg_UP_received(FILE *fp, char *msg_type, struct Player_info *player);
+void log_msg_UP_sent(
+    FILE *fp, char *msg_type, client_t *client
+);
+void log_msg_UP_received(
+    FILE *fp, char *msg_type, int g_client_count, struct Player_info ***p
+);
 
 #endif
