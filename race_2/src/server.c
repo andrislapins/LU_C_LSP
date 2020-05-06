@@ -55,7 +55,7 @@ void gameplay(
     // NOTE: client_t *t client arg - is being used as a "placeholder"
     // for overwriting incoming player data.
 
-    int client_socket[MAX_CLIENTS_ON_SERVER]; // NOTE:? Or MAX_CLIENTS_PER_GAME.
+    int client_socket[MAX_CLIENTS_PER_GAME]; // NOTE:? Or MAX_CLIENTS_PER_GAME.
     int master_socket;
     int new_socket;
     int activity;
@@ -71,7 +71,7 @@ void gameplay(
     fd_set readfds;
 
     // Set up the sets and connections.    
-    for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
+    for (i = 0; i < MAX_CLIENTS_PER_GAME; i++) {
         client_socket[i] = 0;
     }
 
@@ -95,7 +95,7 @@ void gameplay(
     }
 
     // Max of 3 pending connection.
-    ret = listen(master_socket, 3);
+    ret = listen(master_socket, 1);
     if (ret < 0) {
         err_die_server(output, "Listening UDP failed!");
     }
@@ -120,7 +120,7 @@ void gameplay(
         max_sd = master_socket;
 
         // Add child to socket set.
-        for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
+        for (i = 0; i < MAX_CLIENTS_PER_GAME; i++) {
             // Socket descriptor.
             sd = client_socket[i];
 
@@ -161,7 +161,7 @@ void gameplay(
             }
 
             // Add new socket to array of sockets.
-            for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
+            for (i = 0; i < MAX_CLIENTS_PER_GAME; i++) {
                 // If position is empty.
                 if (client_socket[i] == 0) {
                     client_socket[i] = new_socket;
@@ -173,7 +173,7 @@ void gameplay(
         }
 
         // Else its some IO operation on some other socket.
-        for (i = 0; i < MAX_CLIENTS_ON_SERVER; i++) {
+        for (i = 0; i < MAX_CLIENTS_PER_GAME; i++) {
             sd = client_socket[i];
 
             if (FD_ISSET(sd, &readfds)) {
@@ -203,9 +203,11 @@ void gameplay(
                     buffer, msg_type, output, game_id, g_client_count, g_clients
                 );
 
+                printf("loop inside\n");
                 send(sd, buffer, MAX_BUFFER_SIZE, 0);
             }
         }
+        printf("loop outside\n");
     } while (1);
 
     // END all the connection of the players of this game.
@@ -217,7 +219,7 @@ void start_game_response(char *buffer, client_t *client) {
     char            msg_type[MSG_TYPE_LEN];
     char            send_err_msg[ERR_MSG_LEN];
     char            *password;
-    // client_node_t   *current;
+    client_node_t   *current;
     ssize_t         data_n;
     int             game_id;
     int             g_client_count;
@@ -240,7 +242,7 @@ void start_game_response(char *buffer, client_t *client) {
     strcpy(msg_type, "SG\0");
 
     // Collect the players info (client_t) of the chosen game.
-    client_node_t *current = clients_start;
+    current = clients_start;
     g_client_count = 0;
 
     for(i = 0; current != NULL && g_client_count < MAX_CLIENTS_PER_GAME; i++) {
