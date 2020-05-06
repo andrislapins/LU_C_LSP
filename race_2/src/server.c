@@ -35,7 +35,6 @@ int listen_socket;
 
 // Variables for global flag storing.
 FILE *output;
-char *ip;
 int  port;
 
 // Helper function prototypes.
@@ -48,10 +47,86 @@ void init_client(client_t **client, int client_sock);
 void init_game(game_t **game, int chosen_field_id);
 void init_tracks();
 
+void gameplay(char *buffer, client_t *client, int g_client_count, client_t *g_clients[MAX_CLIENTS_PER_GAME]) {
+    char                msg_type[MSG_TYPE_LEN];
+    int                 udpsock, ret, n, game_id;
+    struct sockaddr_in  serv_addr, client_addr;
+    socklen_t           len;
+    // client_t            *orig_client;
+
+    printf("Gameplay\n");
+
+    // orig_client = client;
+    game_id = client->game->ID;
+
+    udpsock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (udpsock < 0) {
+        // NOTE: Send a response back, saying that UDP failed.
+        err_die_server(output, "Could not create a UDP socket!");
+    }
+
+    memset(&serv_addr,   0, sizeof(serv_addr));
+    memset(&client_addr, 0, sizeof(client_addr));
+
+    serv_addr.sin_family        = AF_INET;
+    serv_addr.sin_addr.s_addr   = htonl(INADDR_ANY);
+    serv_addr.sin_port          = htons(port+1);
+
+    ret = bind(udpsock, (const struct sockaddr*)&serv_addr, sizeof(serv_addr));
+    if (ret < 0) {
+        err_die_server(output, "Could not bind UDP socket!");
+    }
+
+    len = sizeof(client_addr);
+
+    /* UPDATE PLAYER */
+
+    strcpy(msg_type, "UP\0");
+
+    // NOTE: In principle, using already initialized client struct to overwrite
+    // received data of every player on this udp socket.
+    do {
+        memset(buffer, '\0', MAX_BUFFER_SIZE);
+
+        while (strlen(buffer) == 0) {
+            n = recvfrom(
+                udpsock, (char*)buffer, MAX_BUFFER_SIZE, MSG_WAITALL, 
+                (struct sockaddr*)&client_addr, &len
+            );
+            if (n < 0) {
+                err_die_server(output, "Receiving data from UDP sokcet failed!");
+            }
+        }
+
+        buffer[n] = '\0';
+        
+        deserialize_msg_UP(buffer, msg_type, client);
+
+        // MANAGE DATA according to player id.... (edit client var).
+
+        memset(buffer, '\0', MAX_BUFFER_SIZE);
+        serialize_msg_UP_response(
+            buffer, msg_type, output, client, game_id, g_client_count, g_clients
+        );
+
+        // NOTE: Broadcast to all clients listening on udpsock?
+        n = sendto(
+            udpsock, (const char*)buffer, MAX_BUFFER_SIZE, MSG_CONFIRM,
+            (const struct sockaddr*)&serv_addr, sizeof(serv_addr)
+        );
+        if (n < 0) {
+            err_die_server(output, "Failed to send data over UDP socket!");
+        }
+
+        // ...
+    } while (1);
+
+    // END all the connection of the players of this game.
+}
+
 // start_game_response send info about the started game to every client of the game.
 void start_game_response(char *buffer, client_t *client) {
     client_t        *g_clients[MAX_CLIENTS_PER_GAME];
-    // char            *buffer_SG;
     char            msg_type[MSG_TYPE_LEN];
     char            send_err_msg[ERR_MSG_LEN];
     char            *password;
@@ -59,10 +134,6 @@ void start_game_response(char *buffer, client_t *client) {
     ssize_t         data_n;
     int             game_id;
     int             g_client_count;
-
-    // Program terminated with signal SIGSEGV, Segmentation fault.
-    // #0  0x00007f9158e497e4 in ?? ()
-    // after receiving SG got segfault
 
     password = malloc(CLIENT_PASS_LEN);
     if (password == NULL) {
@@ -93,14 +164,9 @@ void start_game_response(char *buffer, client_t *client) {
         current = current->next_client;
     }
 
-    // Initialize the values to create the SG msg.
+    /* Initialize the values to create the SG msg */
 
     other = clients_start; // "Other client".
-
-    // buffer_SG = malloc(MAX_BUFFER_SIZE);
-    // if (buffer_SG == NULL) {
-    //     err_die_server(output, "Could not allocate memory for buffer when starting game!");
-    // }
 
     // Start from the begging (overwriting msg type too).
     buffer = buffer - 3;
@@ -112,13 +178,8 @@ void start_game_response(char *buffer, client_t *client) {
         buffer, msg_type, g_client_count, g_clients, client->game
     );
     
+    // for () over g_clients NOTE!!
     while (other != NULL) {
-        // Do NOT send this type of msg for the client himself.
-        if (other->client->player->ID == client->player->ID) {
-            other = other->next_client;
-            continue;
-        }
-
         if (other->client->game->ID == client->game->ID) {
             data_n = send(other->client->sock_fd, buffer, MAX_BUFFER_SIZE, 0);
             if (data_n < 0) {
@@ -135,6 +196,9 @@ void start_game_response(char *buffer, client_t *client) {
     }
 
     free(password);
+
+    // Traverse to the function which handles the gameplay.
+    gameplay(buffer, client, g_client_count, g_clients);
 }
 
 void create_game_response(char *buffer, client_t *client) {
@@ -162,14 +226,13 @@ void create_game_response(char *buffer, client_t *client) {
     // Create a new game.
     init_game(&game, chosen_field_id);
 
+    pthread_mutex_lock(&clients_mutex);
     // Copy the names to the corresponding fields.
     strcpy(game->game_h->name, game_name);
     strcpy(client->player->name, client_name);
 
     // CHECK and FREE the dummy game and only then assign the new game 
     // for the client. NOTE: Should I allow a client create two games?
-    pthread_mutex_lock(&clients_mutex);
-
     if (client->game->ID == 0) {
         free(client->game);
     }
@@ -178,9 +241,9 @@ void create_game_response(char *buffer, client_t *client) {
 
     pthread_mutex_unlock(&clients_mutex);
 
+    // Free these names because the strings have been copied.
     free(client_name);
     free(game_name);
-
 
     // Create a password for the client.
     generate_password(output, client);
@@ -325,8 +388,8 @@ void join_game_response(char *buffer, client_t *client) {
     // Create a password for the client.
     generate_password(output, client);
 
-    buffer = buffer - 3;
     // Set a response back to the client.
+    buffer = buffer - 3;
     memset(buffer, '\0', BUF_SIZE_WO_TYPE);
     strcpy(buffer, msg_type);
     serialize_msg_JG_response(buffer+3, client);
@@ -343,21 +406,18 @@ void join_game_response(char *buffer, client_t *client) {
 
     /* Notify other players */
 
-    // char            *buffer_notify;
-    // char            msg_type[MSG_TYPE_LEN];
     char            send_err_msg[ERR_MSG_LEN];
     client_node_t   *current;
 
     current = clients_start;
     strcpy(msg_type, "NF\0");
-    // buffer_notify = malloc(MAX_BUFFER_SIZE);
-    // buffer = buffer - 3;
 
     while (current != NULL) {
         memset(buffer, '\0', MAX_BUFFER_SIZE);
 
         // Do NOT send this type of msg for the client himself. As I understood
         // its gonna be sent in handle_client in any case back to client.
+        // NOTE: Or send it?
         if (current->client->player->ID == client->player->ID) {
             current = current->next_client;
             continue;
@@ -386,10 +446,9 @@ void join_game_response(char *buffer, client_t *client) {
 
 void handle_message(char *buffer, client_t *client) {
     char msg_type[MSG_TYPE_LEN] = { buffer[0], buffer[1], '\0' };
-    // char err_msg[ERR_MSG_LEN];
 
-    buffer = buffer + 3; // Pass the point of buffer after msg_type.
-    // log_recvd_msg_type(output, client, msg_type);
+    // Pass the point of buffer after msg_type.
+    buffer = buffer + 3;
 
     if (strcmp(msg_type, "CG") == 0) { // CREATE GAME
         log_recvd_msg_type(output, client, msg_type);
@@ -421,9 +480,7 @@ void handle_message(char *buffer, client_t *client) {
         start_game_response(buffer, client);
     } else if (strcmp(msg_type, "PI") == 0) { // PING PONG
         buffer = buffer - 3;
-        buffer[0] = 'P';
-        buffer[1] = 'O';
-        buffer[2] = '\0';
+        strcpy(buffer, "PI\0");
     } else {
         // NOTE: Have a function - print_log AND send_err_msg() in one func.
         // sprintf(err_msg, "Received an unknown type - %s", msg_type);
@@ -509,14 +566,11 @@ int main(int argc, char **argv) {
 
     // Default flag values.
     output = stdout;
-    ip     = "127.0.0.1";
+    // ip     = "127.0.0.1";
     port   = PORT;
 
-    while ((flag = getopt(argc, argv, "a:p:l:h")) != -1) {
+    while ((flag = getopt(argc, argv, "p:l:h")) != -1) {
         switch (flag) {
-            case 'a':
-                strncpy(ip, optarg, IP_LEN);
-                break;
             case 'p':
                 port = atoi(optarg);
                 break;
@@ -535,7 +589,7 @@ int main(int argc, char **argv) {
     // Define various socket settings for listening.
     listen_socket = socket(AF_INET, SOCK_STREAM, 0);
     serv_addr.sin_family        = AF_INET;
-    serv_addr.sin_addr.s_addr   = inet_addr(ip); // NOTE:? Should it be INADDR_ANY
+    serv_addr.sin_addr.s_addr   = INADDR_ANY; 
     serv_addr.sin_port          = htons(port);
 
     // client_addr_len = sizeof(client_addr);
@@ -665,6 +719,12 @@ void init_client(client_t **client, int client_sock) {
         err_die_server(output, "Could not allocate memory for client's player!");
     }
 
+    // Client action struct allocation.
+    (*client)->action = malloc(sizeof(struct Action));
+    if ((*client)->action == NULL) {
+        err_die_server(output, "Could not allocate memory for client's action!");
+    }
+
     // "Dummy " game type allocation for client.
     // ATTENTION: Needs to be freed before assigning a different game pointer.
     (*client)->game = malloc(sizeof(game_t));
@@ -672,7 +732,6 @@ void init_client(client_t **client, int client_sock) {
         err_die_server(output, "Could not allocate memory for game!");
     }
 
-    (*client)->game->ID = 0;
 
     // Initialising the char arrays.
     memset((*client)->ip, '\0', IP_LEN);
@@ -680,6 +739,8 @@ void init_client(client_t **client, int client_sock) {
     memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
 
     // Allocated field definitions.
+    (*client)->game->ID = 0;
+
     (*client)->player->ID           = ++client_id;
     (*client)->player->angle        = 0.0f;
     (*client)->player->speed        = 0.0f;
@@ -687,6 +748,8 @@ void init_client(client_t **client, int client_sock) {
     (*client)->player->laps         = 0;
     (*client)->player->position.x   = 0;
     (*client)->player->position.y   = 0;
+    (*client)->action->x            = 0;
+    (*client)->action->y            = 0;
 
     (*client)->sock_fd = client_sock;
 

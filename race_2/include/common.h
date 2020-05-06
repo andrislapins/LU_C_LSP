@@ -67,6 +67,7 @@ typedef struct game{
 
 typedef struct client {
     struct Player_info  *player;
+    struct Action       *action;
     char                *password, *ip;
     game_t              *game;
 

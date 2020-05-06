@@ -647,3 +647,33 @@ void log_msg_SG_sent(
         msg_type, p_name, pid, client->game->game_h->name
     );
 }
+
+void log_msg_UP_sent(FILE *fp, char *msg_type, client_t *client) {
+    log_time_header(fp);
+    log_client_info(fp, client);
+    fprintf(
+        fp, 
+        "(%s) Sent info about %s to every player of the game\n",
+        msg_type, client->player->name
+    );
+}
+
+void log_msg_UP_received(FILE *fp, char *msg_type, struct Player_info *player) {
+    log_time_header(fp);
+    fprintf(
+        fp,
+        "%sReceived%s:\n",
+        ANSI_YELLOW, ANSI_RESET_ALL
+    );
+    fprintf(
+        fp,
+        "%sType%s: %s\n",
+        ANSI_GREEN, ANSI_RESET_ALL,
+        msg_type
+    );
+    fprintf(
+        fp,
+        "Received new player info from %s%s%s\n",
+        ANSI_YELLOW, player->name, ANSI_RESET_ALL
+    );
+}

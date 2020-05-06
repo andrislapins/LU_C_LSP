@@ -28,10 +28,9 @@ int  port;
 int control_c_safe = 0;
 int start_game_sig = 0;
 
-// struct Player_info **SG; // To assign values inside 
-// // deseriaization func.
-struct Player_info ***SG_pi_others; // Assign address of other_pi_arr_of_p for
-// easier pointer management/iteration.
+// Stores info about other players of a game.
+// Assign address of other_pi_arr_of_p for easier pointer management/iteration.
+struct Player_info ***SG_pi_others;
 
 // Helper function prototypes.
 void handle_sigint(int sig);
@@ -46,11 +45,76 @@ void init_tracks();
 
 /* The main functions for communication */
 
+// start_game handles actual game process or gameplay.
 void start_game(char *buffer, client_t *client) {
     printf("\nGame started!\n");
-    //...
+    
+    char                msg_type[MSG_TYPE_LEN];
+    int                 udpsock, n, ret;
+    socklen_t           len;
+    struct sockaddr_in  serv_addr;
+
+    udpsock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (udpsock < 0) {
+        err_die_client(output, "Could not create UDP connection!");
+    }
+
+    memset(&serv_addr, 0, sizeof(serv_addr));
+
+    serv_addr.sin_family        = AF_INET;
+    serv_addr.sin_addr.s_addr   = inet_addr(ip);
+    serv_addr.sin_port          = htons(port+1);
+
+    /* UPDATE PLAYER */
+
+    strcpy(msg_type, "UP\0");
+
+    // NOTE: make send/recv non-blocking?
+    do {
+        // SOME ACTION OF THIS PLAYER...
+
+        memset(buffer, '\0', MAX_BUFFER_SIZE);
+        serialize_msg_UP(buffer, msg_type, client);
+
+        sendto(
+            udpsock, (const char*)buffer, MAX_BUFFER_SIZE, MSG_CONFIRM,
+            (const struct sockaddr*)&serv_addr, sizeof(serv_addr)
+        );
+
+        memset(buffer, '\0', MAX_BUFFER_SIZE);
+
+        n = recvfrom(
+            udpsock, (char*)buffer, MAX_BUFFER_SIZE, MSG_WAITALL,
+            (struct sockaddr*)&serv_addr, &len
+        );
+
+        // NOTE:? Might need to manage in a seperate thread if this is blocking.
+        // while (strlen(buffer) == 0) {
+        ret = deserialize_msg_UP_response(
+            buffer, msg_type, client, SG_pi_others
+        );
+        if (ret == -1) {
+            continue;
+        }
+
+            // memset(buffer, '\0', MAX_BUFFER_SIZE);
+
+            // n = recvfrom(
+            //     udpsock, (char*)buffer, MAX_BUFFER_SIZE, MSG_WAITALL,
+            //     (struct sockaddr*)&serv_addr, &len
+            // );
+
+            // Log that message about a player has been received.
+        log_msg_UP_received(output, msg_type, (*SG_pi_others)[ret]);
+        // DISPLAY the new data about the received player... after which - exit loop.
+        // ....
+        
+        // }
+    } while (1); // Or other gameplay info is met. END GAME
 }
 
+// join_game requests to join the game of game_id and waits until gets message
+// of START GAME w/ necessary game info.
 void join_game(char *buffer, client_t *client, int game_id) {
     char    msg_type[MSG_TYPE_LEN];
     char    *name_buf;
@@ -97,18 +161,15 @@ void join_game(char *buffer, client_t *client, int game_id) {
     /* Get notified about new players */
 
     // NOTE: Sit in a while loop and get notified about new players joining (max 4) 
-    // until want to proceess to send a START GAME request.
+    // until client wants to send a START GAME request.
     int     pid;
 
     // NOTE: Should store these values globally.
     int client_count;
     struct Player_info **other_pi_arr_of_p; // To assign values inside 
     // deseriaization func.
-    struct Player_info ***p; // Assign address of other_pi_arr_of_p for
+    // struct Player_info ***p; // Assign address of other_pi_arr_of_p for
     // easier pointer management/iteration.
-    // game_t *game;
-
-    // receive notif about yourself?
 
     while (1) {
         memset(buffer,   '\0', MAX_BUFFER_SIZE);
@@ -122,22 +183,19 @@ void join_game(char *buffer, client_t *client, int game_id) {
         send_n_recv(buffer, msg_type, client->sock_fd);
 
         if (buffer[0] == 'S' && buffer[1] == 'G') {
-            // memset(buffer, '\0', MAX_BUFFER_SIZE);
-            // serialize_msg_SG(buffer, msg_type, client);
-
-            // send_n_recv(buffer, msg_type, client->sock_fd);
-
             deserialize_msg_SG_response(
                 buffer, msg_type, &client_count, client->game,
                 &other_pi_arr_of_p
             );
 
             // Assign to more readable pointer.
-            p = &other_pi_arr_of_p;
+            SG_pi_others = &other_pi_arr_of_p;
+
+            // (*SG_pi_others)[client_count] = client->player;
 
             // Log the response.
             log_received_SG_msg(
-                output, msg_type, client->game, client_count, p
+                output, msg_type, client->game, client_count, SG_pi_others
             );
 
             break;
@@ -304,6 +362,8 @@ int get_number_of_fields(char* buffer, client_t *client) {
     return client->game->track->field->ID;
 }
 
+// get_number_of_fields requests a new game creation and waits for other players
+// to join.
 void create_game(char *buffer, client_t *client, int field_id) {
     char    msg_type[MSG_TYPE_LEN];
     char    *name_buf;
@@ -376,9 +436,6 @@ void create_game(char *buffer, client_t *client, int field_id) {
     int client_count;
     struct Player_info **other_pi_arr_of_p; // To assign values inside 
     // deseriaization func.
-    struct Player_info ***p; // Assign address of other_pi_arr_of_p for
-    // easier pointer management/iteration.
-    // game_t *game;
 
     printf(
         "%s%sWaiting for other players to join...%s\n", 
@@ -424,11 +481,14 @@ void create_game(char *buffer, client_t *client, int field_id) {
             );
 
             // Assign to more readable pointer.
-            p = &other_pi_arr_of_p;
+            SG_pi_others = &other_pi_arr_of_p;
+
+            // Add the creator of the game to the players struct array of the game.
+            // (*SG_pi_others)[client_count] = client->player;
 
             // Log the response.
             log_received_SG_msg(
-                output, msg_type, client->game, client_count, p
+                output, msg_type, client->game, client_count, SG_pi_others
             );
 
             break;
@@ -644,6 +704,12 @@ void init_client(client_t **client) {
         err_die_client(output, "Could not allocate memory for client's player!");
     }
 
+    // Client action struct allocation.
+    (*client)->action = malloc(sizeof(struct Action));
+    if ((*client)->action == NULL) {
+        err_die_client(output, "Could not allocate memory for client's action!");
+    }
+
     // Initialising the char arrays.
     memset((*client)->ip, '\0', IP_LEN);
     memset((*client)->player->name, '\0', CLIENT_NAME_LEN);
@@ -656,6 +722,8 @@ void init_client(client_t **client) {
     (*client)->player->laps         = 0;
     (*client)->player->position.x   = 0;
     (*client)->player->position.y   = 0;
+    (*client)->action->x            = 0;
+    (*client)->action->y            = 0;
 
     // Save this client in the global clients list.
     push_client(&clients_start, client);

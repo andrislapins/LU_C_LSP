@@ -1,6 +1,7 @@
 #include "../include/common.h"
 #include "../include/protocol.h"
 #include "../include/serialization.h"
+#include "../include/log_messages.h"
 
 /* === COMMON TYPE SERIALIZATION/DESERIALIZATION === */
 
@@ -362,7 +363,7 @@ void deserialize_msg_SG_response(
      // Deserialize each player info struct.
     for(int i = 0; i < *client_count; i++) {
         pi_arr_of_p[i] = malloc(sizeof(struct Player_info));
-        
+
         buffer = deserialize_int(buffer, &(pi_arr_of_p[i]->ID));
         buffer = deserialize_string(buffer, pi_arr_of_p[i]->name, CLIENT_NAME_LEN);
         buffer = deserialize_float(buffer, &(pi_arr_of_p[i]->position.x));
@@ -390,4 +391,92 @@ void deserialize_msg_SG_response(
 
     // Assign the pointer back to the calling function.
     *other_pi_arr_of_p = pi_arr_of_p;
+}
+
+/* msg UPDATE PLAYER serialization/deserialization */
+
+void serialize_msg_UP(char *buffer, char *msg_type, client_t *client) {
+    buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = serialize_int(buffer, &(client->player->ID));
+    buffer = serialize_int(buffer, &(client->game->ID));
+    buffer = serialize_string(buffer, client->password, CLIENT_PASS_LEN);
+    buffer = serialize_int(buffer, &(client->action->x));
+    buffer = serialize_int(buffer, &(client->action->y));
+}
+
+void deserialize_msg_UP(char *buffer, char *msg_type, client_t *client) {
+    buffer = deserialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = deserialize_int(buffer, &(client->player->ID));
+    buffer = deserialize_int(buffer, &(client->game->ID));
+    buffer = deserialize_string(buffer, client->password, CLIENT_PASS_LEN);
+    buffer = deserialize_int(buffer, &(client->action->x));
+    buffer = deserialize_int(buffer, &(client->action->y));
+}
+
+void serialize_msg_UP_response(
+    char *buffer, char *msg_type, FILE *fp, client_t *client, int client_count, 
+    int game_id, client_t *g_clients[MAX_CLIENTS_PER_GAME]
+) {
+    buffer = serialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = serialize_int(buffer, &game_id);
+
+    // Only sending info about one of the players changes.
+    int one_p = 1;
+    buffer = serialize_int(buffer, &one_p);
+
+    // Serialize only the client which data have been received.
+    for (int i = 0; i < client_count; i++) {
+        if (g_clients[i]->player->ID == client->player->ID) {
+            buffer = serialize_int(buffer, &(g_clients[i]->player->ID));
+            buffer = serialize_string(buffer, g_clients[i]->player->name, CLIENT_NAME_LEN);
+            buffer = serialize_float(buffer, g_clients[i]->player->position.x);
+            buffer = serialize_float(buffer, g_clients[i]->player->position.y);
+            buffer = serialize_float(buffer, g_clients[i]->player->angle);
+            buffer = serialize_float(buffer, g_clients[i]->player->speed);
+            buffer = serialize_float(buffer, g_clients[i]->player->acceleration);
+            buffer = serialize_int(buffer, &(g_clients[i]->player->laps));
+
+            log_msg_UP_sent(fp, msg_type, g_clients[i]);
+            break;
+        }
+    }
+
+}
+
+// deserialize_msg_UP_response returns the index of a player inside global Player_info
+// array after having deserialized his data to this global array.
+int deserialize_msg_UP_response(
+    char *buffer, char *msg_type, client_t *client,
+    struct Player_info ***p_arr
+) {
+    int game_id;
+
+    buffer = deserialize_string(buffer, msg_type , MSG_TYPE_LEN);
+    buffer = deserialize_int(buffer, &game_id);
+
+    // Check if the received game ID is the current client game ID.
+    if (client->game->ID != game_id) {
+        return -1;
+    }
+
+    int count, pid, i;
+    buffer = deserialize_int(buffer, &count);
+
+    for (i = 0; i < count; i++) {
+        buffer = deserialize_int(buffer, &pid);
+
+        if ((*p_arr)[i]->ID == pid) {
+            buffer = deserialize_string(buffer, (*p_arr)[i]->name, CLIENT_NAME_LEN);
+            buffer = deserialize_float(buffer, &((*p_arr)[i]->position.x));
+            buffer = deserialize_float(buffer, &((*p_arr)[i]->position.y));
+            buffer = deserialize_float(buffer, &((*p_arr)[i]->angle));
+            buffer = deserialize_float(buffer, &((*p_arr)[i]->speed));
+            buffer = deserialize_float(buffer, &((*p_arr)[i]->acceleration));
+            buffer = deserialize_int(buffer, &((*p_arr)[i]->laps));
+
+            break;
+        }
+    }
+
+    return i;
 }
